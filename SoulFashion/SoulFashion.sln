@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulFashion", "SoulFashion.csproj", "{B21A7B15-87B4-49C7-B3A8-73D866087464}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SoulFashion", "SoulFashion.csproj", "{B21A7B15-87B4-49C7-B3A8-73D866087464}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Repositories", "..\Repositories\Repositories.csproj", "{F02A08BD-662C-475D-A7DD-EE59BB406F49}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Services", "..\Services\Services.csproj", "{F6459532-A7D2-4898-9D0C-E32735B16354}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{B21A7B15-87B4-49C7-B3A8-73D866087464}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B21A7B15-87B4-49C7-B3A8-73D866087464}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B21A7B15-87B4-49C7-B3A8-73D866087464}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F02A08BD-662C-475D-A7DD-EE59BB406F49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F02A08BD-662C-475D-A7DD-EE59BB406F49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F02A08BD-662C-475D-A7DD-EE59BB406F49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F02A08BD-662C-475D-A7DD-EE59BB406F49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6459532-A7D2-4898-9D0C-E32735B16354}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6459532-A7D2-4898-9D0C-E32735B16354}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6459532-A7D2-4898-9D0C-E32735B16354}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6459532-A7D2-4898-9D0C-E32735B16354}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
