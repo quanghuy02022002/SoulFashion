@@ -1,0 +1,6 @@
+@SoulFashion_HostAddress = http://localhost:5074
+
+GET {{SoulFashion_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
