@@ -36,7 +36,6 @@ public class AccountController : ControllerBase
         return Ok("Đăng ký thành công");
     }
 
-    [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateAccountDto dto)
     {
@@ -44,7 +43,6 @@ public class AccountController : ControllerBase
         return Ok("Đã cập nhật thành công");
     }
 
-    [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
     {
@@ -52,7 +50,6 @@ public class AccountController : ControllerBase
         return Ok("Đổi mật khẩu thành công");
     }
 
-    [Authorize(Roles = "admin")]
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -60,7 +57,6 @@ public class AccountController : ControllerBase
         return Ok(result);
     }
 
-    [Authorize(Roles = "admin")]
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(int id)
     {
@@ -68,7 +64,6 @@ public class AccountController : ControllerBase
         return result == null ? NotFound() : Ok(result);
     }
 
-    [Authorize(Roles = "admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -76,7 +71,6 @@ public class AccountController : ControllerBase
         return NoContent();
     }
 
-    //[Authorize]
     [HttpPut("update-avatar")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UpdateAvatar(int userId, [FromForm] UpdateAvatarDto dto)
