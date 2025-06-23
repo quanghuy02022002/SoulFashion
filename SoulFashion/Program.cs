@@ -74,6 +74,12 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IS3Service, S3Service>();
+builder.Services.AddScoped<ICostumeRepository, CostumeRepository>();
+builder.Services.AddScoped<ICostumeService, CostumeService>();
+builder.Services.AddScoped<ICostumeImageRepository, CostumeImageRepository>();
+builder.Services.AddScoped<ICostumeImageService, CostumeImageService>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 
 
