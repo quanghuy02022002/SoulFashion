@@ -80,6 +80,10 @@ builder.Services.AddScoped<ICostumeImageRepository, CostumeImageRepository>();
 builder.Services.AddScoped<ICostumeImageService, CostumeImageService>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderItemRepository, OrderItemRepository>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IOrderItemService, OrderItemService>();
 
 
 
