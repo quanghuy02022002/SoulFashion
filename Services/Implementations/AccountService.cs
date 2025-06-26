@@ -83,13 +83,16 @@ namespace Services.Implementations
         {
             var user = await _repo.GetByIdAsync(userId) ?? throw new Exception("Không tìm thấy người dùng");
 
-            var imageUrl = await _s3Service.UploadFileAsync(avatar);
+            var fileName = $"avatar_user_{userId}";
+            var imageUrl = await _s3Service.UploadFileAsync(avatar, fileName);
+
             user.AvatarUrl = imageUrl;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _repo.UpdateAsync(user);
             return imageUrl;
         }
+
 
         public async Task ChangePasswordAsync(ChangePasswordDto dto)
         {

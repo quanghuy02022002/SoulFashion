@@ -15,9 +15,8 @@ public partial class Order
 
     public decimal? TotalPrice { get; set; }
 
-    public DateOnly? RentStart { get; set; }
-
-    public DateOnly? RentEnd { get; set; }
+    public DateTime? RentStart { get; set; }
+    public DateTime? RentEnd { get; set; }
 
     public bool? IsPaid { get; set; }
 
