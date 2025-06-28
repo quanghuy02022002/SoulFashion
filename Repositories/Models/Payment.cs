@@ -21,9 +21,8 @@ public partial class Payment
 
     public DateTime? PaidAt { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     public virtual Order Order { get; set; }
 }

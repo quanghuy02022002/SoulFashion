@@ -23,9 +23,8 @@ public partial class User
 
     public bool? IsActive { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     public virtual ICollection<CollaboratorEarning> CollaboratorEarnings { get; set; } = new List<CollaboratorEarning>();
 

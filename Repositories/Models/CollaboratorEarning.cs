@@ -19,9 +19,8 @@ public partial class CollaboratorEarning
 
     public DateTime? PaidAt { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     public virtual OrderItem OrderItem { get; set; }
 

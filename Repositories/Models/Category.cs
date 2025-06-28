@@ -13,9 +13,8 @@ public partial class Category
 
     public int? ParentId { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
-
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     public virtual ICollection<Costume> Costumes { get; set; } = new List<Costume>();
 
