@@ -25,11 +25,11 @@ jobs:
       run: dotnet build SoulFashion/SoulFashion.csproj --configuration Release --no-restore
 
     - name: Publish
-      run: dotnet publish SoulFashion/SoulFashion.csproj --configuration Release --output ./publish
+      run: dotnet publish SoulFashion/SoulFashion.csproj --configuration Release --output ./publish --no-restore
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'soulfashion'  # tên App Service bạn đã tạo
+        app-name: 'soulfashion'  # App Service name
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ./publish
