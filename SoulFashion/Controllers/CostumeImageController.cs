@@ -29,21 +29,30 @@ public class CostumeImageController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var baseName = string.IsNullOrWhiteSpace(request.FileName)
-            ? Path.GetFileNameWithoutExtension(request.File.FileName)
-            : request.FileName;
-
-        var url = await _s3Service.UploadFileAsync(request.File, baseName);
-
-        var dto = new CostumeImageDTO
+        try
         {
-            CostumeId = request.CostumeId,
-            ImageUrl = url
-        };
+            var baseName = string.IsNullOrWhiteSpace(request.FileName)
+                ? Path.GetFileNameWithoutExtension(request.File.FileName)
+                : request.FileName;
 
-        var result = await _service.AddAsync(dto);
-        return Ok(result);
+            var url = await _s3Service.UploadFileAsync(request.File, baseName);
+
+            var dto = new CostumeImageDTO
+            {
+                CostumeId = request.CostumeId,
+                ImageUrl = url
+            };
+
+            var result = await _service.AddAsync(dto);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Upload ERROR] {ex.Message}");
+            return StatusCode(500, $"Upload failed: {ex.Message}");
+        }
     }
+
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
