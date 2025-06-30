@@ -66,12 +66,26 @@ public class CostumeImageController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var image = await _service.GetByIdAsync(id);
-        if (image == null) return NotFound();
+        if (image == null)
+            return NotFound();
 
-        var key = new Uri(image.ImageUrl).Segments.Last();
-        await _s3Service.DeleteFileAsync(key);
+        // Kiểm tra nếu URL hợp lệ trước khi parse
+        if (!string.IsNullOrEmpty(image.ImageUrl))
+        {
+            try
+            {
+                var key = new Uri(image.ImageUrl).Segments.Last();
+                await _s3Service.DeleteFileAsync(key);
+            }
+            catch (Exception ex)
+            {
+                // Optional: log lỗi nếu parse URL thất bại
+                return StatusCode(500, $"Failed to parse S3 URL: {ex.Message}");
+            }
+        }
+
         await _service.DeleteAsync(id);
-
         return NoContent();
     }
+
 }
