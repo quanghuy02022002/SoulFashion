@@ -3,7 +3,7 @@ name: Deploy ASP.NET Core Web API to Azure
 on:
   push:
     branches:
-      - main  # hoặc 'master' nếu bạn dùng nhánh khác
+      - main
 
 jobs:
   build-and-deploy:
@@ -16,21 +16,20 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.x'  # Thay bằng 6.0.x nếu bạn dùng .NET 6
+        dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore SoulFashion/SoulFashion.csproj
 
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build SoulFashion/SoulFashion.csproj --configuration Release --no-restore
 
     - name: Publish
-      run: dotnet publish --configuration Release --output ./publish
+      run: dotnet publish SoulFashion/SoulFashion.csproj --configuration Release --output ./publish
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'soulfashion'  # Đúng với tên App Service bạn đã tạo
+        app-name: 'soulfashion'  # tên App Service bạn đã tạo
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ./publish
-
