@@ -104,8 +104,11 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 
     app.UseSwagger();
-    app.UseSwaggerUI();
-
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "SoulFashion API v1");
+    c.RoutePrefix = string.Empty; // Cho phép truy cập tại URL gốc "/"
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication(); 
