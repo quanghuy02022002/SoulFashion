@@ -19,9 +19,17 @@ public class CostumeImageController : ControllerBase
     [HttpGet("costume/{costumeId}")]
     public async Task<IActionResult> GetByCostumeId(int costumeId)
     {
-        var images = await _service.GetByCostumeIdAsync(costumeId);
-        return Ok(images);
+        try
+        {
+            var images = await _service.GetByCostumeIdAsync(costumeId);
+            return Ok(images);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ex.ToString()); // ← trả về lỗi chi tiết
+        }
     }
+
 
     [HttpPost("upload")]
     public async Task<IActionResult> Upload([FromForm] CostumeImageUploadRequest request)
