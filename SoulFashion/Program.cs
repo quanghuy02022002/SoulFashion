@@ -8,20 +8,17 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Repositories.Models;
-using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "SoulFashion API", Version = "v1" });
 
-    // Thêm cấu hình bảo mật
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = @"JWT Authorization header. 
@@ -52,7 +49,8 @@ Dán token vào đây dưới dạng: Bearer {token}",
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options => {
+    .AddJwtBearer(options =>
+    {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -64,9 +62,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
         };
     });
+
 builder.Services.AddDbContext<AppDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddAuthorization();
+
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
@@ -89,30 +90,31 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<IMomoService, MomoService>();
 
+// Cấu hình CORS: chỉ cho phép từ http://localhost:3000 (frontend React)
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowFrontend3000", policy =>
     {
-        builder.AllowAnyOrigin()
-               .AllowAnyHeader()
-               .AllowAnyMethod();
+        policy.WithOrigins("http://localhost:3000") // hoặc thêm nhiều domain nếu cần
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Sử dụng CORS trước Authentication & Routing
+app.UseCors("AllowFrontend3000");
 
-    app.UseSwagger();
+app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "SoulFashion API v1");
-    c.RoutePrefix = string.Empty; // Cho phép truy cập tại URL gốc "/"
+    c.RoutePrefix = string.Empty;
 });
 
 app.UseHttpsRedirection();
-app.UseAuthentication(); 
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
