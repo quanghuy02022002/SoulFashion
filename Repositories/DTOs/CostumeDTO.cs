@@ -44,6 +44,8 @@ namespace Repositories.DTOs
         public string Gender { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public List<CostumeImageDTO> Images { get; set; } = new();
+
     }
 
 }

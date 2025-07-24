@@ -22,6 +22,7 @@ namespace Services.Implementations
         public async Task<List<CostumeDTO>> GetAllAsync(string? search, int page, int pageSize)
         {
             var items = await _repository.GetAllAsync(search, page, pageSize);
+
             return items.Select(c => new CostumeDTO
             {
                 CostumeId = c.CostumeId,
@@ -35,9 +36,20 @@ namespace Services.Implementations
                 Size = c.Size,
                 Condition = c.Condition,
                 Gender = c.Gender,
-                IsActive = (bool)c.IsActive
+                IsActive = (bool)c.IsActive,
+
+                // ✅ Thêm ánh xạ hình ảnh
+                Images = c.CostumeImages?.Select(i => new CostumeImageDTO
+                {
+                    ImageId = i.ImageId,
+                    CostumeId = i.CostumeId,
+                    ImageUrl = i.ImageUrl,
+                    CreatedAt = i.CreatedAt,
+                    UpdatedAt = i.UpdatedAt
+                }).ToList() ?? new List<CostumeImageDTO>()
             }).ToList();
         }
+
 
         public async Task<int> CountAsync(string? search)
         {

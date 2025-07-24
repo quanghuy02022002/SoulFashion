@@ -20,7 +20,9 @@ namespace Repositories.Implementations
 
         public async Task<List<Costume>> GetAllAsync(string? search, int page, int pageSize)
         {
-            var query = _context.Costumes.AsQueryable();
+            var query = _context.Costumes
+                .Include(c => c.CostumeImages) // 🔥 Thêm Include để lấy luôn ảnh
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
