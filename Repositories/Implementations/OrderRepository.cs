@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Repositories.DTOs;
 using Repositories.Interfaces;
 using Repositories.Models;
 using System;
@@ -29,8 +30,6 @@ namespace Repositories.Implementations
                 .Include(o => o.Payments)
                 .ToListAsync();
         }
-
-
 
         public async Task<Order?> GetByIdAsync(int id)
         {
@@ -67,6 +66,7 @@ namespace Repositories.Implementations
             }
         }
     }
+
 
 
 }

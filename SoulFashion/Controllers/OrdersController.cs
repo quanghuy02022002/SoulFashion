@@ -36,7 +36,6 @@ namespace SoulFashion.Controllers
             try
             {
                 var order = await _service.GetOrderByIdAsync(id);
-                if (order == null) return NotFound();
                 return Ok(order);
             }
             catch (Exception ex)
@@ -51,7 +50,7 @@ namespace SoulFashion.Controllers
             try
             {
                 var created = await _service.CreateOrderAsync(dto);
-                return CreatedAtAction(nameof(GetById), new { id = created.OrderId }, created);
+                return CreatedAtAction(nameof(GetById), new { id = created.OrderId }, new { created.OrderId });
             }
             catch (Exception ex)
             {
@@ -101,4 +100,5 @@ namespace SoulFashion.Controllers
             }
         }
     }
+
 }
