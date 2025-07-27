@@ -246,9 +246,6 @@ namespace Services.Implementations
             return dto;
         }
 
-        Task<IEnumerable<Order>> IOrderService.GetAllOrdersAsync()
-        {
-            throw new NotImplementedException();
-        }
+    
     }
 }
