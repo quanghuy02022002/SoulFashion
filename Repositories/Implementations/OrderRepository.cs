@@ -18,18 +18,31 @@ namespace Repositories.Implementations
             _context = context;
         }
 
-        public async Task<IEnumerable<Order>> GetAllAsync() =>
-        await _context.Orders
-            .Include(o => o.OrderItems)
-            .Include(o => o.Payments)
-            .Include(o => o.Deposit)
-            .Include(o => o.StatusHistories)
-            .Include(o => o.ReturnInspection)
-            .ToListAsync();
+        public async Task<IEnumerable<Order>> GetAllAsync()
+        {
+            return await _context.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.OrderItems)
+                .Include(o => o.Deposit)
+                .Include(o => o.StatusHistories)
+                .Include(o => o.ReturnInspection)
+                .Include(o => o.Payments)
+                .ToListAsync();
+        }
 
 
-        public async Task<Order?> GetByIdAsync(int id) =>
-            await _context.Orders.FindAsync(id);
+
+        public async Task<Order?> GetByIdAsync(int id)
+        {
+            return await _context.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.OrderItems)
+                .Include(o => o.Deposit)
+                .Include(o => o.StatusHistories)
+                .Include(o => o.ReturnInspection)
+                .Include(o => o.Payments)
+                .FirstOrDefaultAsync(o => o.OrderId == id);
+        }
 
         public async Task<Order> CreateAsync(Order order)
         {
