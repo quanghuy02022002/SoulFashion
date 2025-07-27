@@ -17,44 +17,88 @@ namespace SoulFashion.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() =>
-            Ok(await _service.GetAllOrdersAsync());
+        public async Task<IActionResult> GetAll()
+        {
+            try
+            {
+                var orders = await _service.GetAllOrdersAsync();
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server khi lấy danh sách đơn hàng: {ex.Message}");
+            }
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var order = await _service.GetOrderByIdAsync(id);
-            if (order == null) return NotFound();
-            return Ok(order);
+            try
+            {
+                var order = await _service.GetOrderByIdAsync(id);
+                if (order == null) return NotFound();
+                return Ok(order);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi lấy đơn hàng: {ex.Message}");
+            }
         }
 
         [HttpPost]
         public async Task<IActionResult> Create(OrderDto dto)
         {
-            var created = await _service.CreateOrderAsync(dto);
-            return CreatedAtAction(nameof(GetById), new { id = created.OrderId }, created);
+            try
+            {
+                var created = await _service.CreateOrderAsync(dto);
+                return CreatedAtAction(nameof(GetById), new { id = created.OrderId }, created);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi tạo đơn hàng: {ex.Message}");
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, OrderDto dto)
         {
-            await _service.UpdateOrderAsync(id, dto);
-            return NoContent();
+            try
+            {
+                await _service.UpdateOrderAsync(id, dto);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi cập nhật đơn hàng: {ex.Message}");
+            }
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            await _service.DeleteOrderAsync(id);
-            return NoContent();
+            try
+            {
+                await _service.DeleteOrderAsync(id);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi xóa đơn hàng: {ex.Message}");
+            }
         }
 
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> ChangeStatus(int id, OrderStatusUpdateDto dto)
         {
-            await _service.UpdateOrderStatusAsync(id, dto.Status);
-            return NoContent();
+            try
+            {
+                await _service.UpdateOrderStatusAsync(id, dto.Status);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi cập nhật trạng thái đơn hàng: {ex.Message}");
+            }
         }
     }
-
 }
