@@ -1,10 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Repositories.Interfaces;
 using Repositories.Models;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Repositories.Implementations
@@ -18,8 +16,12 @@ namespace Repositories.Implementations
             _context = context;
         }
 
-        public async Task<IEnumerable<OrderItem>> GetByOrderIdAsync(int orderId) =>
-            await _context.OrderItems.Where(i => i.OrderId == orderId).ToListAsync();
+        public async Task<IEnumerable<OrderItem>> GetByOrderIdAsync(int orderId)
+        {
+            return await _context.OrderItems
+                .Where(x => x.OrderId == orderId)
+                .ToListAsync();
+        }
 
         public async Task<OrderItem> CreateAsync(OrderItem item)
         {
@@ -38,5 +40,4 @@ namespace Repositories.Implementations
             }
         }
     }
-
 }

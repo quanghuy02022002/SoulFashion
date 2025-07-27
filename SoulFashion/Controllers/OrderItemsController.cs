@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Repositories.DTOs;
 using Services.Interfaces;
+using System.Threading.Tasks;
 
 namespace SoulFashion.Controllers
 {
@@ -17,22 +17,21 @@ namespace SoulFashion.Controllers
         }
 
         [HttpGet("order/{orderId}")]
-        public async Task<IActionResult> GetByOrderId(int orderId) =>
+        public async Task<IActionResult> GetByOrder(int orderId) =>
             Ok(await _service.GetItemsByOrderIdAsync(orderId));
 
-        [HttpPost]
-        public async Task<IActionResult> Create(OrderItemDto dto)
+        [HttpPost("order/{orderId}")]
+        public async Task<IActionResult> Create(int orderId, [FromBody] OrderItemDto dto)
         {
-            var created = await _service.CreateOrderItemAsync(dto);
+            var created = await _service.CreateOrderItemAsync(orderId, dto);
             return Ok(created);
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{itemId}")]
+        public async Task<IActionResult> Delete(int itemId)
         {
-            await _service.DeleteOrderItemAsync(id);
+            await _service.DeleteOrderItemAsync(itemId);
             return NoContent();
         }
     }
-
 }

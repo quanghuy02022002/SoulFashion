@@ -10,15 +10,15 @@ namespace Repositories.DTOs
     {
         public int CustomerId { get; set; }
         public string Status { get; set; } = "pending";
-        public decimal TotalPrice { get; set; }
         public DateTime? RentStart { get; set; }
         public DateTime? RentEnd { get; set; }
         public bool IsPaid { get; set; } = false;
         public string? Note { get; set; }
-        public string PaymentMethod { get; set; } = "cash,vnpay,momo";
+        public string PaymentMethod { get; set; } = "cash";
 
-        public List<OrderItemDto> Items { get; set; } = new();
+        public List<OrderItemDto> Items { get; set; } = new(); // ✅ Bắt buộc
     }
+
 
 
 }

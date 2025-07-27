@@ -76,24 +76,24 @@ namespace Services.Implementations
             });
 
             // 👉 Nếu là đơn thuê thì tính tiền cọc
-            if (createdOrder.RentStart.HasValue && createdOrder.RentEnd.HasValue)
-            {
-                var rentalDays = (createdOrder.RentEnd.Value - createdOrder.RentStart.Value).Days;
-                var baseDeposit = createdOrder.TotalPrice ?? 0m;
-                var suggestedDeposit = Math.Max(
-                    baseDeposit * 0.5m,
-                    baseDeposit / rentalDays * 3m);
+            //if (createdOrder.RentStart.HasValue && createdOrder.RentEnd.HasValue)
+            //{
+            //    var rentalDays = (createdOrder.RentEnd.Value - createdOrder.RentStart.Value).Days;
+            //    var baseDeposit = createdOrder.TotalPrice ?? 0m;
+            //    var suggestedDeposit = Math.Max(
+            //        baseDeposit * 0.5m,
+            //        baseDeposit / rentalDays * 3m);
 
-                await _depositRepository.CreateAsync(new Deposit
-                {
-                    OrderId = createdOrder.OrderId,
-                    DepositAmount = decimal.Round(suggestedDeposit, 0),
-                    DepositStatus = "pending",
-                    PaymentMethod = dto.PaymentMethod ?? "cash, zalopay, vnpay",
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                });
-            }
+            //    await _depositRepository.CreateAsync(new Deposit
+            //    {
+            //        OrderId = createdOrder.OrderId,
+            //        DepositAmount = decimal.Round(suggestedDeposit, 0),
+            //        DepositStatus = "pending",
+            //        PaymentMethod = dto.PaymentMethod ?? "cash, zalopay, vnpay",
+            //        CreatedAt = DateTime.Now,
+            //        UpdatedAt = DateTime.Now
+            //    });
+            //}
 
             return createdOrder;
         }

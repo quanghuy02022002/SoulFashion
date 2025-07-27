@@ -6,12 +6,13 @@ using System.Threading.Tasks;
 
 namespace Repositories.DTOs
 {
-    public class OrderItemDto
-    {
-        public int OrderId { get; set; }
-        public int CostumeId { get; set; }
-        public int Quantity { get; set; }
-        public decimal Price { get; set; }
-    }
+    
+        public class OrderItemDto
+        {
+            public int CostumeId { get; set; }
+            public int Quantity { get; set; }
+            public bool IsRental { get; set; } // ✔ Phân biệt môn thuê hay mua
+        }
+    
 
 }
