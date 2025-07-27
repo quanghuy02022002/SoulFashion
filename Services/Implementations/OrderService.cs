@@ -31,8 +31,21 @@ namespace Services.Implementations
             _costumeRepository = costumeRepository;
         }
 
-        public async Task<IEnumerable<Order>> GetAllOrdersAsync() =>
-            await _orderRepository.GetAllAsync();
+        public async Task<IEnumerable<OrderSummaryDto>> GetAllOrdersAsync()
+        {
+            var orders = await _orderRepository.GetAllAsync();
+
+            return orders.Select(order => new OrderSummaryDto
+            {
+                OrderId = order.OrderId,
+                Status = order.Status,
+                TotalPrice = order.TotalPrice,
+                RentStart = order.RentStart,
+                RentEnd = order.RentEnd,
+                IsPaid = order.IsPaid ?? false,
+                CustomerId = order.CustomerId
+            });
+        }
 
         public async Task<Order?> GetOrderByIdAsync(int id) =>
             await _orderRepository.GetByIdAsync(id);
@@ -231,6 +244,11 @@ namespace Services.Implementations
             };
 
             return dto;
+        }
+
+        Task<IEnumerable<Order>> IOrderService.GetAllOrdersAsync()
+        {
+            throw new NotImplementedException();
         }
     }
 }

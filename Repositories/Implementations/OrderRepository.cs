@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Repositories.DTOs;
 using Repositories.Interfaces;
 using Repositories.Models;
 using System;
@@ -22,14 +21,11 @@ namespace Repositories.Implementations
         public async Task<IEnumerable<Order>> GetAllAsync()
         {
             return await _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.OrderItems)
-                .Include(o => o.Deposit)
-                .Include(o => o.StatusHistories)
-                .Include(o => o.ReturnInspection)
-                .Include(o => o.Payments)
+                .AsNoTracking()
                 .ToListAsync();
         }
+
+
 
         public async Task<Order?> GetByIdAsync(int id)
         {
@@ -66,7 +62,6 @@ namespace Repositories.Implementations
             }
         }
     }
-
 
 
 }
