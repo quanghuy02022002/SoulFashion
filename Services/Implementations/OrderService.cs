@@ -5,7 +5,6 @@ using Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Services.Implementations
@@ -16,17 +15,20 @@ namespace Services.Implementations
         private readonly IOrderStatusHistoryRepository _statusHistoryRepository;
         private readonly IDepositRepository _depositRepository;
         private readonly IReturnInspectionRepository _returnInspectionRepository;
+        private readonly ICostumeRepository _costumeRepository;
 
         public OrderService(
             IOrderRepository orderRepository,
             IOrderStatusHistoryRepository statusHistoryRepository,
             IDepositRepository depositRepository,
-            IReturnInspectionRepository returnInspectionRepository)
+            IReturnInspectionRepository returnInspectionRepository,
+            ICostumeRepository costumeRepository)
         {
             _orderRepository = orderRepository;
             _statusHistoryRepository = statusHistoryRepository;
             _depositRepository = depositRepository;
             _returnInspectionRepository = returnInspectionRepository;
+            _costumeRepository = costumeRepository;
         }
 
         public async Task<IEnumerable<Order>> GetAllOrdersAsync() =>
@@ -49,21 +51,30 @@ namespace Services.Implementations
                 IsPaid = dto.IsPaid,
                 Note = dto.Note,
                 CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now,
-
-                // 👉 Thêm danh sách sản phẩm
-                OrderItems = dto.Items.Select(x => new OrderItem
-                {
-                    CostumeId = x.CostumeId,
-                    Quantity = x.Quantity,
-                    Price = x.Price,
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                }).ToList()
+                UpdatedAt = DateTime.Now
             };
 
-            // 👉 Tính tổng tiền dựa vào item
-            order.TotalPrice = order.OrderItems.Sum(x => x.Quantity * x.Price);
+            var items = new List<OrderItem>();
+            foreach (var itemDto in dto.Items)
+            {
+                var costume = await _costumeRepository.GetByIdAsync(itemDto.CostumeId);
+                if (costume == null) throw new Exception("Costume không tồn tại");
+
+                var price = itemDto.IsRental ? costume.PriceRent : costume.PriceSale;
+                if (price == null) throw new Exception("Không có giá phù hợp cho costume này");
+
+                items.Add(new OrderItem
+                {
+                    CostumeId = itemDto.CostumeId,
+                    Quantity = itemDto.Quantity,
+                    Price = price.Value,
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+
+            order.OrderItems = items;
+            order.TotalPrice = items.Sum(x => x.Quantity * x.Price);
 
             var createdOrder = await _orderRepository.CreateAsync(order);
 
@@ -75,29 +86,27 @@ namespace Services.Implementations
                 Note = "Order created"
             });
 
-            // 👉 Nếu là đơn thuê thì tính tiền cọc
-            //if (createdOrder.RentStart.HasValue && createdOrder.RentEnd.HasValue)
-            //{
-            //    var rentalDays = (createdOrder.RentEnd.Value - createdOrder.RentStart.Value).Days;
-            //    var baseDeposit = createdOrder.TotalPrice ?? 0m;
-            //    var suggestedDeposit = Math.Max(
-            //        baseDeposit * 0.5m,
-            //        baseDeposit / rentalDays * 3m);
+            if (createdOrder.RentStart.HasValue && createdOrder.RentEnd.HasValue)
+            {
+                var rentalDays = (createdOrder.RentEnd.Value - createdOrder.RentStart.Value).Days;
+                var baseDeposit = createdOrder.TotalPrice ?? 0m;
+                var suggestedDeposit = Math.Max(
+                    baseDeposit * 0.5m,
+                    baseDeposit / rentalDays * 3m);
 
-            //    await _depositRepository.CreateAsync(new Deposit
-            //    {
-            //        OrderId = createdOrder.OrderId,
-            //        DepositAmount = decimal.Round(suggestedDeposit, 0),
-            //        DepositStatus = "pending",
-            //        PaymentMethod = dto.PaymentMethod ?? "cash, zalopay, vnpay",
-            //        CreatedAt = DateTime.Now,
-            //        UpdatedAt = DateTime.Now
-            //    });
-            //}
+                await _depositRepository.CreateAsync(new Deposit
+                {
+                    OrderId = createdOrder.OrderId,
+                    DepositAmount = decimal.Round(suggestedDeposit, 0),
+                    DepositStatus = "pending",
+                    PaymentMethod = dto.PaymentMethod ?? "cash, zalopay, vnpay",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
 
             return createdOrder;
         }
-
 
         public async Task UpdateOrderAsync(int id, OrderDto dto)
         {
@@ -108,7 +117,6 @@ namespace Services.Implementations
                 throw new Exception("RentEnd must be after RentStart");
 
             order.Status = dto.Status.ToLower();
-            order.TotalPrice = dto.TotalPrice;
             order.RentStart = dto.RentStart;
             order.RentEnd = dto.RentEnd;
             order.IsPaid = dto.IsPaid;
@@ -198,7 +206,7 @@ namespace Services.Implementations
                 {
                     CostumeId = x.CostumeId,
                     Quantity = x.Quantity,
-                    Price = x.Price
+                    IsRental = order.RentStart != null // tạm dựa vào logic ngày thuê
                 }).ToList(),
                 Deposit = order.Deposit != null ? new DepositDto
                 {
