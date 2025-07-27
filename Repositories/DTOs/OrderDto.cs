@@ -15,6 +15,10 @@ namespace Repositories.DTOs
         public DateTime? RentEnd { get; set; }
         public bool IsPaid { get; set; } = false;
         public string? Note { get; set; }
+        public string PaymentMethod { get; set; } = "cash,vnpay,momo";
+
+        public List<OrderItemDto> Items { get; set; } = new();
     }
+
 
 }

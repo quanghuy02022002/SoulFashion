@@ -21,7 +21,9 @@ public partial class Order
     public bool? IsPaid { get; set; }
 
     public string Note { get; set; }
-
+    public Deposit? Deposit { get; set; }
+    public ICollection<OrderStatusHistory>? StatusHistories { get; set; }
+    public ReturnInspection? ReturnInspection { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 

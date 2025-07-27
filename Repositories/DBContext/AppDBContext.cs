@@ -31,7 +31,10 @@ public partial class AppDBContext : DbContext
     public virtual DbSet<Review> Reviews { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
-
+    public DbSet<Deposit> Deposits { get; set; }
+    public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
+    public DbSet<ReturnInspection> ReturnInspections { get; set; }
+    public DbSet<UserVerification> UserVerifications { get; set; }
     public static string GetConnectionString(string connectionStringName)
     {
         var config = new ConfigurationBuilder()
@@ -263,7 +266,11 @@ public partial class AppDBContext : DbContext
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
         });
-
+        modelBuilder.Entity<Deposit>().Property(p => p.CreatedAt).HasDefaultValueSql("GETDATE()");
+        modelBuilder.Entity<Deposit>().Property(p => p.UpdatedAt).HasDefaultValueSql("GETDATE()");
+        modelBuilder.Entity<OrderStatusHistory>().Property(p => p.ChangedAt).HasDefaultValueSql("GETDATE()");
+        modelBuilder.Entity<ReturnInspection>().Property(p => p.CheckedAt).HasDefaultValueSql("GETDATE()");
+        modelBuilder.Entity<UserVerification>().Property(p => p.CreatedAt).HasDefaultValueSql("GETDATE()");
         OnModelCreatingPartial(modelBuilder);
     }
 

@@ -25,6 +25,7 @@ public partial class User
 
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public UserVerification? Verification { get; set; }
 
     public virtual ICollection<CollaboratorEarning> CollaboratorEarnings { get; set; } = new List<CollaboratorEarning>();
 
