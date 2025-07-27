@@ -35,7 +35,7 @@ namespace SoulFashion.Controllers
         {
             try
             {
-                var order = await _service.GetOrderByIdAsync(id);
+                var order = await _service.GetOrderDetailAsync(id);
                 return Ok(order);
             }
             catch (Exception ex)

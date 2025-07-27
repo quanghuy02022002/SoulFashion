@@ -12,6 +12,7 @@ namespace Services.Interfaces
     {
         Task<IEnumerable<Order>> GetAllOrdersAsync();
         Task<Order?> GetOrderByIdAsync(int id);
+        Task<OrderDetailDto> GetOrderDetailAsync(int id);
         Task<Order> CreateOrderAsync(OrderDto dto);
         Task UpdateOrderAsync(int id, OrderDto dto);
         Task DeleteOrderAsync(int id);
