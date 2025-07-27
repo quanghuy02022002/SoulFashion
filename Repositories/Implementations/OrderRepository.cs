@@ -19,7 +19,14 @@ namespace Repositories.Implementations
         }
 
         public async Task<IEnumerable<Order>> GetAllAsync() =>
-            await _context.Orders.ToListAsync();
+        await _context.Orders
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payments)
+            .Include(o => o.Deposit)
+            .Include(o => o.StatusHistories)
+            .Include(o => o.ReturnInspection)
+            .ToListAsync();
+
 
         public async Task<Order?> GetByIdAsync(int id) =>
             await _context.Orders.FindAsync(id);
