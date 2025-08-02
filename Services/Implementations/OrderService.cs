@@ -245,7 +245,32 @@ namespace Services.Implementations
 
             return dto;
         }
+        public async Task UpdateDepositStatusAsync(int orderId, string newStatus)
+        {
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            if (order == null) throw new Exception("Order not found");
 
-    
+            var deposit = order.Deposit;
+            if (deposit == null) throw new Exception("Deposit not found for this order");
+
+            var validStatuses = new[] { "pending", "paid", "refunded", "cancelled" };
+            if (!validStatuses.Contains(newStatus.ToLower()))
+                throw new Exception("Invalid deposit status");
+
+            deposit.DepositStatus = newStatus.ToLower();
+            deposit.UpdatedAt = DateTime.Now;
+
+            // ✅ Nếu đã thanh toán, thì đánh dấu đơn hàng là IsPaid = true
+            if (deposit.DepositStatus == "paid")
+            {
+                order.IsPaid = true;
+                order.UpdatedAt = DateTime.Now;
+                await _orderRepository.UpdateAsync(order);
+            }
+
+            await _depositRepository.UpdateAsync(deposit);
+        }
+
+
     }
 }

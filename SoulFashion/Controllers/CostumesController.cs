@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Repositories.DTOs;
 using Services.Interfaces;
@@ -38,6 +39,7 @@ namespace SoulFashion.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "admin,Collaborator")]
         public async Task<IActionResult> Create([FromBody] CostumeDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -46,6 +48,7 @@ namespace SoulFashion.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "admin,Collaborator")]
         public async Task<IActionResult> Update(int id, [FromBody] CostumeDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -61,6 +64,7 @@ namespace SoulFashion.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "admin,Collaborator")]
         public async Task<IActionResult> Delete(int id)
         {
             var success = await _service.DeleteAsync(id);

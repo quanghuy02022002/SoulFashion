@@ -6,6 +6,7 @@ using System.Security.Claims;
 
 [ApiController]
 [Route("api/[controller]")]
+
 public class AccountController : ControllerBase
 {
     private readonly IAccountService _service;
@@ -51,6 +52,7 @@ public class AccountController : ControllerBase
     }
 
     [HttpGet]
+
     public async Task<IActionResult> GetAll()
     {
         var result = await _service.GetAllAsync();
@@ -65,6 +67,7 @@ public class AccountController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Delete(int id)
     {
         await _service.DeleteAsync(id);
@@ -78,5 +81,15 @@ public class AccountController : ControllerBase
         var imageUrl = await _service.UpdateAvatarAsync(userId, dto.Avatar);
         return Ok(new { avatarUrl = imageUrl });
     }
+
+    [HttpPut("{id}/change-role")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ChangeRole(int id, [FromBody] ChangeRoleDto dto)
+    {
+        await _service.ChangeRoleAsync(id, dto.NewRole);
+        return Ok(new { message = "Cập nhật vai trò thành công" });
+    }
+
+
 
 }

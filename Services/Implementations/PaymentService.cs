@@ -28,7 +28,7 @@ namespace Services.Implementations
         public async Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef)
         {
             var payment = new Payment
-            {
+            {   
                 OrderId = dto.OrderId,
                 Amount = dto.Amount,
                 PaymentMethod = dto.PaymentMethod.ToLower(),

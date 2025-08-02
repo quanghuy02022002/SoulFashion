@@ -10,5 +10,9 @@ namespace Repositories.DTOs
     {
         public string Status { get; set; } = string.Empty;
     }
+    public class DepositStatusUpdateDto
+    {
+        public string NewStatus { get; set; } = string.Empty;
+    }
 
 }

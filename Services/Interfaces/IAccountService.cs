@@ -15,5 +15,7 @@ namespace Services.Interfaces
         Task<List<User>> GetAllAsync();
         Task<User?> GetByIdAsync(int id);
         Task DeleteAsync(int id);
+        Task ChangeRoleAsync(int userId, string newRole);
+
     }
 }

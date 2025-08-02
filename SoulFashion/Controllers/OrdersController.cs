@@ -99,6 +99,20 @@ namespace SoulFashion.Controllers
                 return StatusCode(500, $"Lỗi khi cập nhật trạng thái đơn hàng: {ex.Message}");
             }
         }
+        [HttpPatch("{id}/deposit-status")]
+        public async Task<IActionResult> UpdateDepositStatus(int id, DepositStatusUpdateDto dto)
+        {
+            try
+            {
+                await _service.UpdateDepositStatusAsync(id, dto.NewStatus);
+                return Ok(new { message = "Deposit status updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi cập nhật trạng thái tiền cọc: {ex.Message}");
+            }
+        }
+
     }
 
 }

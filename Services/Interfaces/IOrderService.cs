@@ -17,6 +17,8 @@ namespace Services.Interfaces
         Task UpdateOrderAsync(int id, OrderDto dto);
         Task DeleteOrderAsync(int id);
         Task UpdateOrderStatusAsync(int id, string status);
+        Task UpdateDepositStatusAsync(int orderId, string newStatus);
+
     }
 
 }

@@ -115,5 +115,23 @@ namespace Services.Implementations
 
             await _repo.DeleteAsync(user);
         }
+        public async Task ChangeRoleAsync(int userId, string newRole)
+        {
+            var user = await _repo.GetByIdAsync(userId) ?? throw new Exception("Không tìm thấy người dùng");
+
+            // Danh sách role hợp lệ (phân biệt đúng định dạng)
+            var allowedRoles = new[] { "customer", "admin", "Collaborator" };
+
+            // Tìm vai trò khớp không phân biệt hoa thường
+            var matchedRole = allowedRoles.FirstOrDefault(r => r.Equals(newRole, StringComparison.OrdinalIgnoreCase));
+            if (matchedRole == null)
+                throw new Exception("Vai trò không hợp lệ");
+
+            user.Role = matchedRole; // Gán đúng format chuẩn
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _repo.UpdateAsync(user);
+        }
+
     }
 }
