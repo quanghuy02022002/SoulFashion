@@ -103,7 +103,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend3000", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // hoặc thêm nhiều domain nếu cần
+        policy.WithOrigins("http://localhost:3000", "https://soul-of-fashion.vercel.app") // hoặc thêm nhiều domain nếu cần
               .AllowAnyHeader()
               .AllowAnyMethod();
     });

@@ -99,24 +99,35 @@ namespace Services.Implementations
                 Note = "Order created"
             });
 
-            if (createdOrder.RentStart.HasValue && createdOrder.RentEnd.HasValue)
-            {
-                var rentalDays = (createdOrder.RentEnd.Value - createdOrder.RentStart.Value).Days;
-                var baseDeposit = createdOrder.TotalPrice ?? 0m;
-                var suggestedDeposit = Math.Max(
-                    baseDeposit * 0.5m,
-                    baseDeposit / rentalDays * 3m);
+            // ✅ Chỉ tính tiền cọc theo yêu cầu
+            decimal totalDeposit = 0;
+            int totalQuantity = 0;
 
-                await _depositRepository.CreateAsync(new Deposit
-                {
-                    OrderId = createdOrder.OrderId,
-                    DepositAmount = decimal.Round(suggestedDeposit, 0),
-                    DepositStatus = "pending",
-                    PaymentMethod = dto.PaymentMethod ?? "cash, zalopay, vnpay",
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                });
+            foreach (var item in items)
+            {
+                var costume = await _costumeRepository.GetByIdAsync(item.CostumeId);
+                if (costume == null) throw new Exception("Costume không tồn tại khi tính cọc");
+
+                var priceSale = costume.PriceSale ?? throw new Exception("Không có giá bán");
+
+                totalDeposit += priceSale * item.Quantity;
+                totalQuantity += item.Quantity;
             }
+
+            if (totalQuantity > 10)
+            {
+                totalDeposit /= 2;
+            }
+
+            await _depositRepository.CreateAsync(new Deposit
+            {
+                OrderId = createdOrder.OrderId,
+                DepositAmount = decimal.Round(totalDeposit, 0),
+                DepositStatus = "pending",
+                PaymentMethod = dto.PaymentMethod ?? "cash",
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            });
 
             return createdOrder;
         }

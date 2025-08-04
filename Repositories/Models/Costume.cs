@@ -12,6 +12,7 @@ public partial class Costume
     public string Name { get; set; }
 
     public string Description { get; set; }
+    public int CreatedByUserId { get; set; }
 
     public int CategoryId { get; set; }
 
