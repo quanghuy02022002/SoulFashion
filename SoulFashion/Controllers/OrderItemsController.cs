@@ -17,7 +17,6 @@ namespace SoulFashion.Controllers
             _service = service;
         }
 
-        // ✅ GET ALL
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -28,9 +27,14 @@ namespace SoulFashion.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Lỗi server khi lấy tất cả OrderItems: {ex.Message}");
+                // In lỗi ra console
+                Console.WriteLine("‼ Lỗi khi lấy OrderItems: " + ex.ToString());
+
+                // Trả ra message rõ ràng
+                return StatusCode(500, $"‼ Lỗi server: {ex.Message}\n{ex.StackTrace}");
             }
         }
+
 
         // ✅ GET BY ORDER ID
         [HttpGet("order/{orderId}")]
