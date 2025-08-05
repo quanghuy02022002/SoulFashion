@@ -24,9 +24,6 @@ namespace Repositories.DTOs
         public int CreatedByUserId { get; set; }
         public string? CreatedByName { get; set; } // map từ user.FullName nếu cần
 
-        [Range(1, int.MaxValue)]
-        public int OwnerId { get; set; }
-
         [Range(0, double.MaxValue)]
         public decimal? PriceSale { get; set; }
 

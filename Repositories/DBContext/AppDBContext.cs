@@ -125,7 +125,6 @@ public partial class AppDBContext : DbContext
                 .HasConstraintName("FK__Costumes__Catego__47DBAE45");
 
             entity.HasOne(d => d.Owner).WithMany(p => p.Costumes)
-                .HasForeignKey(d => d.OwnerId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Costumes__OwnerI__48CFD27E");
         });

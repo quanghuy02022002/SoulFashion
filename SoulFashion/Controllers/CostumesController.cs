@@ -37,15 +37,15 @@ namespace SoulFashion.Controllers
             if (result == null) return NotFound();
             return Ok(result);
         }
-
         [HttpPost]
         [Authorize(Roles = "admin,Collaborator")]
         public async Task<IActionResult> Create([FromBody] CostumeDTO dto)
         {
-            dto.CreatedByUserId = int.Parse(User.FindFirst("id")!.Value); // auto lấy userId
+            dto.CreatedByUserId = int.Parse(User.FindFirst("id")!.Value); // tự động lấy người dùng hiện tại
             var result = await _service.AddAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = result.CostumeId }, result);
         }
+
 
 
 

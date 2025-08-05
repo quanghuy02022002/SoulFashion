@@ -22,7 +22,6 @@ public class CostumeService : ICostumeService
             Name = c.Name,
             Description = c.Description,
             CategoryId = c.CategoryId,
-            OwnerId = c.OwnerId,
             CreatedByUserId = c.CreatedByUserId,
             CreatedByName = c.CreatedBy?.FullName, // ✅ map tên người tạo
             PriceSale = c.PriceSale,
@@ -60,7 +59,6 @@ public class CostumeService : ICostumeService
             Name = c.Name,
             Description = c.Description,
             CategoryId = c.CategoryId,
-            OwnerId = c.OwnerId,
             CreatedByUserId = c.CreatedByUserId,
             CreatedByName = c.CreatedBy?.FullName, // ✅ map người tạo
             PriceSale = c.PriceSale,
@@ -88,6 +86,7 @@ public class CostumeService : ICostumeService
             Name = dto.Name,
             Description = dto.Description,
             CategoryId = dto.CategoryId,
+            CreatedByUserId = dto.CreatedByUserId,
             PriceSale = dto.PriceSale,
             PriceRent = dto.PriceRent,
             Quantity = dto.Quantity,
@@ -112,8 +111,6 @@ public class CostumeService : ICostumeService
         costume.Name = dto.Name;
         costume.Description = dto.Description;
         costume.CategoryId = dto.CategoryId;
-        costume.OwnerId = dto.OwnerId;
-        // ❌ Không cập nhật lại CreatedByUserId
         costume.PriceSale = dto.PriceSale;
         costume.PriceRent = dto.PriceRent;
         costume.Quantity = dto.Quantity;

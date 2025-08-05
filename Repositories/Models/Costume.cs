@@ -17,8 +17,6 @@ public partial class Costume
 
     public int CategoryId { get; set; }
 
-    public int OwnerId { get; set; }
-
     public decimal? PriceSale { get; set; }
 
     public decimal? PriceRent { get; set; }
