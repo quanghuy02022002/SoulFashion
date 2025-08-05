@@ -31,6 +31,8 @@ public partial class AppDBContext : DbContext
     public virtual DbSet<Review> Reviews { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+    public virtual DbSet<CartItem> CartItems { get; set; } // ✅ thêm dòng này
+
     public DbSet<Deposit> Deposits { get; set; }
     public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
     public DbSet<ReturnInspection> ReturnInspections { get; set; }
