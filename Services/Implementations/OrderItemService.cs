@@ -18,23 +18,31 @@ namespace Services.Implementations
             _repository = repository;
             _costumeRepository = costumeRepository;
         }
+
         public async Task<IEnumerable<OrderItem>> GetAllOrderItemsAsync()
         {
             return await _repository.GetAllAsync();
         }
 
-        public async Task<IEnumerable<OrderItem>> GetItemsByOrderIdAsync(int orderId) =>
-            await _repository.GetByOrderIdAsync(orderId);
+        public async Task<OrderItem?> GetOrderItemByIdAsync(int itemId)
+        {
+            return await _repository.GetByIdAsync(itemId);
+        }
+
+        public async Task<IEnumerable<OrderItem>> GetItemsByOrderIdAsync(int orderId)
+        {
+            return await _repository.GetByOrderIdAsync(orderId);
+        }
 
         public async Task<OrderItem> CreateOrderItemAsync(int orderId, OrderItemDto dto)
         {
             var costume = await _costumeRepository.GetByIdAsync(dto.CostumeId);
             if (costume == null)
-                throw new Exception("Costume không tồn tại");
+                throw new Exception("❌ Costume không tồn tại");
 
             var price = dto.IsRental ? costume.PriceRent : costume.PriceSale;
             if (price == null)
-                throw new Exception("Costume chưa có giá phù hợp.");
+                throw new Exception("❌ Costume chưa có giá phù hợp");
 
             var item = new OrderItem
             {
@@ -49,7 +57,31 @@ namespace Services.Implementations
             return await _repository.CreateAsync(item);
         }
 
-        public async Task DeleteOrderItemAsync(int itemId) =>
+        public async Task UpdateOrderItemAsync(int itemId, OrderItemDto dto)
+        {
+            var item = await _repository.GetByIdAsync(itemId);
+            if (item == null)
+                throw new Exception("❌ OrderItem không tồn tại");
+
+            var costume = await _costumeRepository.GetByIdAsync(dto.CostumeId);
+            if (costume == null)
+                throw new Exception("❌ Costume không tồn tại");
+
+            var price = dto.IsRental ? costume.PriceRent : costume.PriceSale;
+            if (price == null)
+                throw new Exception("❌ Costume chưa có giá phù hợp");
+
+            item.CostumeId = dto.CostumeId;
+            item.Quantity = dto.Quantity;
+            item.Price = price.Value;
+            item.UpdatedAt = DateTime.Now;
+
+            await _repository.UpdateAsync(item);
+        }
+
+        public async Task DeleteOrderItemAsync(int itemId)
+        {
             await _repository.DeleteAsync(itemId);
+        }
     }
 }

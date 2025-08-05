@@ -17,6 +17,7 @@ namespace SoulFashion.Controllers
             _service = service;
         }
 
+        // ✅ GET ALL: /api/OrderItems
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,16 +28,29 @@ namespace SoulFashion.Controllers
             }
             catch (Exception ex)
             {
-                // In lỗi ra console
-                Console.WriteLine("‼ Lỗi khi lấy OrderItems: " + ex.ToString());
-
-                // Trả ra message rõ ràng
-                return StatusCode(500, $"‼ Lỗi server: {ex.Message}\n{ex.StackTrace}");
+                return StatusCode(500, $"Lỗi server khi lấy tất cả OrderItems: {ex.Message}");
             }
         }
 
+        // ✅ GET BY ID: /api/OrderItems/{itemId}
+        [HttpGet("{itemId}")]
+        public async Task<IActionResult> GetById(int itemId)
+        {
+            try
+            {
+                var item = await _service.GetOrderItemByIdAsync(itemId);
+                if (item == null)
+                    return NotFound($"OrderItem với ID {itemId} không tồn tại");
 
-        // ✅ GET BY ORDER ID
+                return Ok(item);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server khi lấy OrderItem theo ID: {ex.Message}");
+            }
+        }
+
+        // ✅ GET BY ORDER ID: /api/OrderItems/order/{orderId}
         [HttpGet("order/{orderId}")]
         public async Task<IActionResult> GetByOrder(int orderId)
         {
@@ -51,14 +65,14 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ CREATE OrderItem
+        // ✅ CREATE OrderItem: /api/OrderItems/order/{orderId}
         [HttpPost("order/{orderId}")]
         public async Task<IActionResult> Create(int orderId, [FromBody] OrderItemDto dto)
         {
             try
             {
                 var created = await _service.CreateOrderItemAsync(orderId, dto);
-                return Ok(created);
+                return CreatedAtAction(nameof(GetById), new { itemId = created.OrderItemId }, created);
             }
             catch (Exception ex)
             {
@@ -66,7 +80,22 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ DELETE OrderItem
+        // ✅ UPDATE OrderItem: /api/OrderItems/{itemId}
+        [HttpPut("{itemId}")]
+        public async Task<IActionResult> Update(int itemId, [FromBody] OrderItemDto dto)
+        {
+            try
+            {
+                await _service.UpdateOrderItemAsync(itemId, dto);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server khi cập nhật OrderItem: {ex.Message}");
+            }
+        }
+
+        // ✅ DELETE OrderItem: /api/OrderItems/{itemId}
         [HttpDelete("{itemId}")]
         public async Task<IActionResult> Delete(int itemId)
         {
