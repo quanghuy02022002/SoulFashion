@@ -80,5 +80,15 @@ namespace Repositories.Implementations
             await _context.SaveChangesAsync();
             return true;
         }
+        public async Task<List<Costume>> GetByUserIdAsync(int userId)
+        {
+            return await _context.Costumes
+                .Include(c => c.CostumeImages)
+                .Include(c => c.Category)
+                .Where(c => c.CreatedByUserId == userId)
+                .OrderByDescending(c => c.CreatedAt)
+                .ToListAsync();
+        }
+
     }
 }

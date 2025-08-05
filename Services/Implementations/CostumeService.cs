@@ -123,6 +123,36 @@ public class CostumeService : ICostumeService
         await _repository.UpdateAsync(costume);
         return dto;
     }
+    public async Task<List<CostumeDTO>> GetByUserIdAsync(int userId)
+    {
+        var costumes = await _repository.GetByUserIdAsync(userId);
+
+        return costumes.Select(c => new CostumeDTO
+        {
+            CostumeId = c.CostumeId,
+            Name = c.Name,
+            Description = c.Description,
+            CategoryId = c.CategoryId,
+            CreatedByUserId = c.CreatedByUserId,
+            CreatedByName = c.CreatedBy?.FullName,
+            PriceSale = c.PriceSale,
+            PriceRent = c.PriceRent,
+            Quantity = c.Quantity,
+            Size = c.Size,
+            Condition = c.Condition,
+            Gender = c.Gender,
+            IsActive = c.IsActive,
+            Images = c.CostumeImages?.Select(i => new CostumeImageDTO
+            {
+                ImageId = i.ImageId,
+                CostumeId = i.CostumeId,
+                ImageUrl = i.ImageUrl,
+                CreatedAt = i.CreatedAt,
+                UpdatedAt = i.UpdatedAt
+            }).ToList() ?? new List<CostumeImageDTO>()
+        }).ToList();
+    }
+
 
     public async Task<bool> DeleteAsync(int id)
     {

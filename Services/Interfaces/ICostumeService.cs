@@ -14,6 +14,8 @@ namespace Services.Interfaces
         Task<CostumeDTO?> GetByIdAsync(int id);
         Task<CostumeDTO> AddAsync(CostumeDTO dto);
         Task<CostumeDTO> UpdateAsync(int id, CostumeDTO dto);
+        Task<List<CostumeDTO>> GetByUserIdAsync(int userId);
+
         Task<bool> DeleteAsync(int id);
     }
 }

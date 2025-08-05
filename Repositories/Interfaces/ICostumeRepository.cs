@@ -10,6 +10,7 @@ namespace Repositories.Interfaces
     public interface ICostumeRepository
     {
         Task<List<Costume>> GetAllAsync(string? search, int page, int pageSize);
+        Task<List<Costume>> GetByUserIdAsync(int userId);
         Task<int> CountAsync(string? search);
         Task<Costume?> GetByIdAsync(int id);
         Task<Costume> AddAsync(Costume costume);

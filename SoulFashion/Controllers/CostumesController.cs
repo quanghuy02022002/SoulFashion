@@ -68,6 +68,15 @@ namespace SoulFashion.Controllers
             var result = await _service.UpdateAsync(id, dto);
             return Ok(result);
         }
+        [HttpGet("by-user")]
+        [Authorize(Roles = "admin,Collaborator")]
+        public async Task<IActionResult> GetByUser()
+        {
+            var userId = int.Parse(User.FindFirst("id")!.Value);
+            var result = await _service.GetByUserIdAsync(userId);
+            return Ok(result);
+        }
+
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "admin,Collaborator")]
