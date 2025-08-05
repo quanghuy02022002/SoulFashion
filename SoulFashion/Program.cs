@@ -91,7 +91,8 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<IMomoService, MomoService>();
-
+builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
+builder.Services.AddScoped<ICartItemService, CartItemService>();
 builder.Services.AddScoped<IReturnInspectionRepository, ReturnInspectionRepository>();
 builder.Services.AddScoped<IReturnInspectionService, ReturnInspectionService>();
 builder.Services.AddScoped<IDepositRepository, DepositRepository>();
