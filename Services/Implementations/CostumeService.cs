@@ -88,8 +88,6 @@ public class CostumeService : ICostumeService
             Name = dto.Name,
             Description = dto.Description,
             CategoryId = dto.CategoryId,
-            OwnerId = dto.OwnerId,
-            CreatedByUserId = dto.CreatedByUserId, // ✅ gán người tạo
             PriceSale = dto.PriceSale,
             PriceRent = dto.PriceRent,
             Quantity = dto.Quantity,

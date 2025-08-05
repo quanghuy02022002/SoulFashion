@@ -42,15 +42,12 @@ namespace SoulFashion.Controllers
         [Authorize(Roles = "admin,Collaborator")]
         public async Task<IActionResult> Create([FromBody] CostumeDTO dto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            // 🔐 Lấy ID người tạo từ token
-            var userId = int.Parse(User.FindFirstValue("id"));
-            dto.CreatedByUserId = userId;
-
+            dto.CreatedByUserId = int.Parse(User.FindFirst("id")!.Value); // auto lấy userId
             var result = await _service.AddAsync(dto);
             return CreatedAtAction(nameof(GetById), new { id = result.CostumeId }, result);
         }
+
+
 
         [HttpPut("{id}")]
         [Authorize(Roles = "admin,Collaborator")]
