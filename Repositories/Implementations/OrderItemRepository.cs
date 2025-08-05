@@ -15,6 +15,14 @@ namespace Repositories.Implementations
         {
             _context = context;
         }
+        public async Task<IEnumerable<OrderItem>> GetAllAsync()
+        {
+            return await _context.OrderItems
+                .Include(i => i.Costume)
+                .Include(i => i.Order)
+                .ToListAsync();
+        }
+
 
         public async Task<IEnumerable<OrderItem>> GetByOrderIdAsync(int orderId)
         {

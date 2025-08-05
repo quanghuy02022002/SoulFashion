@@ -9,6 +9,7 @@ namespace Repositories.Interfaces
 {
     public interface IOrderItemRepository
     {
+        Task<IEnumerable<OrderItem>> GetAllAsync();
         Task<IEnumerable<OrderItem>> GetByOrderIdAsync(int orderId);
         Task<OrderItem> CreateAsync(OrderItem item);
         Task DeleteAsync(int itemId);

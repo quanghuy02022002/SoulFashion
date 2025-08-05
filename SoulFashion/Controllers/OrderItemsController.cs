@@ -15,6 +15,12 @@ namespace SoulFashion.Controllers
         {
             _service = service;
         }
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var items = await _service.GetAllOrderItemsAsync();
+            return Ok(items);
+        }
 
         [HttpGet("order/{orderId}")]
         public async Task<IActionResult> GetByOrder(int orderId) =>

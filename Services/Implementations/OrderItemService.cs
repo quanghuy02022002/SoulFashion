@@ -18,6 +18,10 @@ namespace Services.Implementations
             _repository = repository;
             _costumeRepository = costumeRepository;
         }
+        public async Task<IEnumerable<OrderItem>> GetAllOrderItemsAsync()
+        {
+            return await _repository.GetAllAsync();
+        }
 
         public async Task<IEnumerable<OrderItem>> GetItemsByOrderIdAsync(int orderId) =>
             await _repository.GetByOrderIdAsync(orderId);
