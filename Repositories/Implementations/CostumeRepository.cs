@@ -21,7 +21,8 @@ namespace Repositories.Implementations
         public async Task<List<Costume>> GetAllAsync(string? search, int page, int pageSize)
         {
             var query = _context.Costumes
-                .Include(c => c.CostumeImages) // 🔥 Thêm Include để lấy luôn ảnh
+                .Include(c => c.CostumeImages)
+                .Include(c => c.CreatedBy) // ✅ include người tạo
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -50,7 +51,10 @@ namespace Repositories.Implementations
 
         public async Task<Costume?> GetByIdAsync(int id)
         {
-            return await _context.Costumes.FindAsync(id);
+            return await _context.Costumes
+                .Include(c => c.CostumeImages)
+                .Include(c => c.CreatedBy) // ✅ include người tạo
+                .FirstOrDefaultAsync(c => c.CostumeId == id);
         }
 
         public async Task<Costume> AddAsync(Costume costume)
@@ -77,5 +81,4 @@ namespace Repositories.Implementations
             return true;
         }
     }
-
 }

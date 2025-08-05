@@ -21,6 +21,9 @@ namespace Repositories.DTOs
         [Range(1, int.MaxValue)]
         public int CategoryId { get; set; }
 
+        public int CreatedByUserId { get; set; }
+        public string? CreatedByName { get; set; } // map từ user.FullName nếu cần
+
         [Range(1, int.MaxValue)]
         public int OwnerId { get; set; }
 
