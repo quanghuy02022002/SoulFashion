@@ -48,7 +48,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CartItems");
+                    b.ToTable("CartItems", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Category", b =>
@@ -82,7 +82,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.CollaboratorEarning", b =>
@@ -127,7 +127,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CollaboratorEarnings");
+                    b.ToTable("CollaboratorEarnings", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Costume", b =>
@@ -202,7 +202,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("OwnerUserId");
 
-                    b.ToTable("Costumes");
+                    b.ToTable("Costumes", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.CostumeImage", b =>
@@ -234,7 +234,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("CostumeId");
 
-                    b.ToTable("CostumeImages");
+                    b.ToTable("CostumeImages", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Deposit", b =>
@@ -274,7 +274,7 @@ namespace Repositories.Migrations
                     b.HasIndex("OrderId")
                         .IsUnique();
 
-                    b.ToTable("Deposits");
+                    b.ToTable("Deposits", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Order", b =>
@@ -325,7 +325,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.OrderItem", b =>
@@ -365,7 +365,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("OrderItems");
+                    b.ToTable("OrderItems", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.OrderStatusHistory", b =>
@@ -395,7 +395,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("OrderStatusHistories");
+                    b.ToTable("OrderStatusHistories", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Payment", b =>
@@ -444,7 +444,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.ReturnInspection", b =>
@@ -478,7 +478,7 @@ namespace Repositories.Migrations
                     b.HasIndex("OrderId")
                         .IsUnique();
 
-                    b.ToTable("ReturnInspections");
+                    b.ToTable("ReturnInspections", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.Review", b =>
@@ -518,7 +518,7 @@ namespace Repositories.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Reviews");
+                    b.ToTable("Reviews", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.User", b =>
@@ -578,7 +578,7 @@ namespace Repositories.Migrations
                     b.HasIndex(new[] { "Email" }, "UQ__Users__A9D10534E1A04CED")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.UserVerification", b =>
@@ -616,7 +616,7 @@ namespace Repositories.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("UserVerifications");
+                    b.ToTable("UserVerifications", (string)null);
                 });
 
             modelBuilder.Entity("Repositories.Models.CartItem", b =>
@@ -676,15 +676,14 @@ namespace Repositories.Migrations
                         .HasConstraintName("FK__Costumes__Catego__47DBAE45");
 
                     b.HasOne("Repositories.Models.User", "CreatedBy")
-                        .WithMany()
+                        .WithMany("Costumes")
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Repositories.Models.User", "Owner")
-                        .WithMany("Costumes")
-                        .HasForeignKey("OwnerUserId")
-                        .HasConstraintName("FK__Costumes__OwnerI__48CFD27E");
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId");
 
                     b.Navigation("Category");
 

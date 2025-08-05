@@ -124,9 +124,7 @@ public partial class AppDBContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__Costumes__Catego__47DBAE45");
 
-            entity.HasOne(d => d.Owner).WithMany(p => p.Costumes)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Costumes__OwnerI__48CFD27E");
+         
         });
 
         modelBuilder.Entity<CostumeImage>(entity =>
@@ -190,6 +188,11 @@ public partial class AppDBContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__OrderItem__Order__5812160E");
         });
+        modelBuilder.Entity<Costume>()
+    .HasOne(c => c.CreatedBy)
+    .WithMany(u => u.Costumes) // hoặc .WithMany() nếu bạn không cần navigation ngược
+    .HasForeignKey(c => c.CreatedByUserId)
+    .OnDelete(DeleteBehavior.Restrict); // hoặc .Cascade tùy vào yêu cầu
 
         modelBuilder.Entity<Payment>(entity =>
         {

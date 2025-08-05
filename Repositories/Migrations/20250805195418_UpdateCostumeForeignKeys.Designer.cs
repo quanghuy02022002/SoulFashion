@@ -12,8 +12,8 @@ using Repositories.Models;
 namespace Repositories.Migrations
 {
     [DbContext(typeof(AppDBContext))]
-    [Migration("20250805194044_RemoveOwnerIdFromCostume")]
-    partial class RemoveOwnerIdFromCostume
+    [Migration("20250805195418_UpdateCostumeForeignKeys")]
+    partial class UpdateCostumeForeignKeys
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -679,15 +679,14 @@ namespace Repositories.Migrations
                         .HasConstraintName("FK__Costumes__Catego__47DBAE45");
 
                     b.HasOne("Repositories.Models.User", "CreatedBy")
-                        .WithMany()
+                        .WithMany("Costumes")
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Repositories.Models.User", "Owner")
-                        .WithMany("Costumes")
-                        .HasForeignKey("OwnerUserId")
-                        .HasConstraintName("FK__Costumes__OwnerI__48CFD27E");
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId");
 
                     b.Navigation("Category");
 

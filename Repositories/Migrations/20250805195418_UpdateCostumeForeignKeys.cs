@@ -5,7 +5,7 @@
 namespace Repositories.Migrations
 {
     /// <inheritdoc />
-    public partial class RemoveOwnerIdFromCostume : Migration
+    public partial class UpdateCostumeForeignKeys : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -66,10 +66,10 @@ namespace Repositories.Migrations
                 column: "CreatedByUserId",
                 principalTable: "Users",
                 principalColumn: "UserId",
-                onDelete: ReferentialAction.Cascade);
+                onDelete: ReferentialAction.Restrict);
 
             migrationBuilder.AddForeignKey(
-                name: "FK__Costumes__OwnerI__48CFD27E",
+                name: "FK_Costumes_Users_OwnerUserId",
                 table: "Costumes",
                 column: "OwnerUserId",
                 principalTable: "Users",
@@ -84,7 +84,7 @@ namespace Repositories.Migrations
                 table: "Costumes");
 
             migrationBuilder.DropForeignKey(
-                name: "FK__Costumes__OwnerI__48CFD27E",
+                name: "FK_Costumes_Users_OwnerUserId",
                 table: "Costumes");
 
             migrationBuilder.DropIndex(
