@@ -2,6 +2,7 @@
 using Repositories.DTOs;
 using Services.Interfaces;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace SoulFashion.Controllers
@@ -17,7 +18,7 @@ namespace SoulFashion.Controllers
             _service = service;
         }
 
-        // ✅ GET ALL: /api/OrderItems
+        // ✅ GET ALL
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -32,16 +33,14 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ GET BY ID: /api/OrderItems/{itemId}
+        // ✅ GET BY ID
         [HttpGet("{itemId}")]
         public async Task<IActionResult> GetById(int itemId)
         {
             try
             {
                 var item = await _service.GetOrderItemByIdAsync(itemId);
-                if (item == null)
-                    return NotFound($"OrderItem với ID {itemId} không tồn tại");
-
+                if (item == null) return NotFound("❌ OrderItem không tồn tại");
                 return Ok(item);
             }
             catch (Exception ex)
@@ -50,7 +49,7 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ GET BY ORDER ID: /api/OrderItems/order/{orderId}
+        // ✅ GET BY ORDER ID
         [HttpGet("order/{orderId}")]
         public async Task<IActionResult> GetByOrder(int orderId)
         {
@@ -65,14 +64,14 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ CREATE OrderItem: /api/OrderItems/order/{orderId}
+        // ✅ CREATE OrderItem
         [HttpPost("order/{orderId}")]
         public async Task<IActionResult> Create(int orderId, [FromBody] OrderItemDto dto)
         {
             try
             {
                 var created = await _service.CreateOrderItemAsync(orderId, dto);
-                return CreatedAtAction(nameof(GetById), new { itemId = created.OrderItemId }, created);
+                return Ok(created);
             }
             catch (Exception ex)
             {
@@ -80,7 +79,7 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ UPDATE OrderItem: /api/OrderItems/{itemId}
+        // ✅ UPDATE OrderItem
         [HttpPut("{itemId}")]
         public async Task<IActionResult> Update(int itemId, [FromBody] OrderItemDto dto)
         {
@@ -95,7 +94,7 @@ namespace SoulFashion.Controllers
             }
         }
 
-        // ✅ DELETE OrderItem: /api/OrderItems/{itemId}
+        // ✅ DELETE OrderItem
         [HttpDelete("{itemId}")]
         public async Task<IActionResult> Delete(int itemId)
         {

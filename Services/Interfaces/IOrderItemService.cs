@@ -7,9 +7,9 @@ namespace Services.Interfaces
 {
     public interface IOrderItemService
     {
-        Task<IEnumerable<OrderItem>> GetAllOrderItemsAsync();
-        Task<OrderItem?> GetOrderItemByIdAsync(int itemId);
-        Task<IEnumerable<OrderItem>> GetItemsByOrderIdAsync(int orderId);
+        Task<IEnumerable<OrderItemResponseDto>> GetAllOrderItemsAsync();
+        Task<OrderItemResponseDto?> GetOrderItemByIdAsync(int itemId);
+        Task<IEnumerable<OrderItemResponseDto>> GetItemsByOrderIdAsync(int orderId);
         Task<OrderItem> CreateOrderItemAsync(int orderId, OrderItemDto dto);
         Task UpdateOrderItemAsync(int itemId, OrderItemDto dto);
         Task DeleteOrderItemAsync(int itemId);

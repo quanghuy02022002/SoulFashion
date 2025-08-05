@@ -19,19 +19,59 @@ namespace Services.Implementations
             _costumeRepository = costumeRepository;
         }
 
-        public async Task<IEnumerable<OrderItem>> GetAllOrderItemsAsync()
+        public async Task<IEnumerable<OrderItemResponseDto>> GetAllOrderItemsAsync()
         {
-            return await _repository.GetAllAsync();
+            var items = await _repository.GetAllAsync();
+
+            return items.Select(item => new OrderItemResponseDto
+            {
+                OrderItemId = item.OrderItemId,
+                OrderId = item.OrderId,
+                CostumeId = item.CostumeId,
+                CostumeName = item.Costume?.Name,
+                CostumeImageUrl = item.Costume?.CostumeImages?.FirstOrDefault()?.ImageUrl ?? "",
+                Quantity = item.Quantity,
+                Price = item.Price,
+                CreatedAt = item.CreatedAt,
+                UpdatedAt = item.UpdatedAt
+            });
         }
 
-        public async Task<OrderItem?> GetOrderItemByIdAsync(int itemId)
+        public async Task<OrderItemResponseDto?> GetOrderItemByIdAsync(int itemId)
         {
-            return await _repository.GetByIdAsync(itemId);
+            var item = await _repository.GetByIdAsync(itemId);
+            if (item == null) return null;
+
+            return new OrderItemResponseDto
+            {
+                OrderItemId = item.OrderItemId,
+                OrderId = item.OrderId,
+                CostumeId = item.CostumeId,
+                CostumeName = item.Costume?.Name,
+                CostumeImageUrl = item.Costume?.CostumeImages?.FirstOrDefault()?.ImageUrl ?? "",
+                Quantity = item.Quantity,
+                Price = item.Price,
+                CreatedAt = item.CreatedAt,
+                UpdatedAt = item.UpdatedAt
+            };
         }
 
-        public async Task<IEnumerable<OrderItem>> GetItemsByOrderIdAsync(int orderId)
+        public async Task<IEnumerable<OrderItemResponseDto>> GetItemsByOrderIdAsync(int orderId)
         {
-            return await _repository.GetByOrderIdAsync(orderId);
+            var items = await _repository.GetByOrderIdAsync(orderId);
+
+            return items.Select(item => new OrderItemResponseDto
+            {
+                OrderItemId = item.OrderItemId,
+                OrderId = item.OrderId,
+                CostumeId = item.CostumeId,
+                CostumeName = item.Costume?.Name,
+                CostumeImageUrl = item.Costume?.CostumeImages?.FirstOrDefault()?.ImageUrl ?? "",
+                Quantity = item.Quantity,
+                Price = item.Price,
+                CreatedAt = item.CreatedAt,
+                UpdatedAt = item.UpdatedAt
+            });
         }
 
         public async Task<OrderItem> CreateOrderItemAsync(int orderId, OrderItemDto dto)

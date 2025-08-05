@@ -20,6 +20,7 @@ namespace Repositories.Implementations
         {
             return await _context.OrderItems
                 .Include(i => i.Costume)
+                    .ThenInclude(c => c.CostumeImages)
                 .Include(i => i.Order)
                 .ToListAsync();
         }
@@ -28,6 +29,7 @@ namespace Repositories.Implementations
         {
             return await _context.OrderItems
                 .Include(i => i.Costume)
+                    .ThenInclude(c => c.CostumeImages)
                 .Include(i => i.Order)
                 .FirstOrDefaultAsync(i => i.OrderItemId == itemId);
         }
@@ -37,6 +39,7 @@ namespace Repositories.Implementations
             return await _context.OrderItems
                 .Where(x => x.OrderId == orderId)
                 .Include(i => i.Costume)
+                    .ThenInclude(c => c.CostumeImages)
                 .ToListAsync();
         }
 
