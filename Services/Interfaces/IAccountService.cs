@@ -16,6 +16,9 @@ namespace Services.Interfaces
         Task<User?> GetByIdAsync(int id);
         Task DeleteAsync(int id);
         Task ChangeRoleAsync(int userId, string newRole);
+        Task<List<UserVerification>> GetPendingVerificationsAsync();
+        Task VerifyUserAsync(int userId);
+
 
     }
 }

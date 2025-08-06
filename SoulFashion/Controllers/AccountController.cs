@@ -90,6 +90,21 @@ public class AccountController : ControllerBase
         return Ok(new { message = "Cập nhật vai trò thành công" });
     }
 
+    [Authorize(Roles = "admin")]
+    [HttpGet("verifications/pending")]
+    public async Task<IActionResult> GetPendingVerifications()
+    {
+        var result = await _service.GetPendingVerificationsAsync();
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "admin")]
+    [HttpPut("verifications/approve/{userId}")]
+    public async Task<IActionResult> ApproveVerification(int userId)
+    {
+        await _service.VerifyUserAsync(userId);
+        return Ok("Xác minh thành công");
+    }
 
 
 }

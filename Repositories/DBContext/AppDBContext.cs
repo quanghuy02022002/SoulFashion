@@ -274,7 +274,11 @@ public partial class AppDBContext : DbContext
         modelBuilder.Entity<Deposit>().Property(p => p.UpdatedAt).HasDefaultValueSql("GETDATE()");
         modelBuilder.Entity<OrderStatusHistory>().Property(p => p.ChangedAt).HasDefaultValueSql("GETDATE()");
         modelBuilder.Entity<ReturnInspection>().Property(p => p.CheckedAt).HasDefaultValueSql("GETDATE()");
-        modelBuilder.Entity<UserVerification>().Property(p => p.CreatedAt).HasDefaultValueSql("GETDATE()");
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.UserVerification)
+            .WithOne(v => v.User)
+            .HasForeignKey<UserVerification>(v => v.UserId)
+            .OnDelete(DeleteBehavior.Cascade); // hoặc .Restrict tuỳ yêu cầu
         OnModelCreatingPartial(modelBuilder);
     }
 

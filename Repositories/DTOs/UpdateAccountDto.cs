@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -15,7 +16,11 @@ namespace Repositories.DTOs
         [Phone]
         public string Phone { get; set; }
 
-        public string AvatarUrl { get; set; }
+        [StringLength(12, MinimumLength = 12)]
+        public string? CCCD { get; set; }
+        [StringLength(200)]
+        public string? Address { get; set; }
+        public IFormFile? VerificationImage { get; set; } // ảnh CCCD
     }
 
 
