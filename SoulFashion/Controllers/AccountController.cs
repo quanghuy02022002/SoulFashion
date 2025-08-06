@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Services.Interfaces;
 using Repositories.DTOs;
 using System.Security.Claims;
+using Services.Implementations;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -94,9 +95,17 @@ public class AccountController : ControllerBase
     [HttpGet("verifications/pending")]
     public async Task<IActionResult> GetPendingVerifications()
     {
-        var result = await _service.GetPendingVerificationsAsync();
-        return Ok(result);
+        try
+        {
+            var result = await _service.GetPendingVerificationsAsync();
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, "Lỗi server: " + ex.Message);
+        }
     }
+
 
     [Authorize(Roles = "admin")]
     [HttpPut("verifications/approve/{userId}")]

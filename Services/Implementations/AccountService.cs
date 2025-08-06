@@ -189,16 +189,19 @@ namespace Services.Implementations
             try
             {
                 var all = await _repo.GetAllAsync();
-                return all
+                var pending = all
                     .Where(u => u.UserVerification != null && u.UserVerification.Verified == false)
-                    .Select(u => u.UserVerification!) // thêm dấu ! để nói với compiler là không null
+                    .Select(u => u.UserVerification!)
                     .ToList();
+
+                return pending;
             }
             catch (Exception ex)
             {
                 throw new Exception("Lỗi khi lấy danh sách xác minh: " + ex.Message);
             }
         }
+
 
 
         public async Task VerifyUserAsync(int userId)
