@@ -184,14 +184,23 @@ namespace Services.Implementations
 
             await _repo.UpdateAsync(user);
         }
-        public async Task<List<UserVerification>> GetPendingVerificationsAsync()
+        public async Task<List<UserVerificationDto>> GetPendingVerificationsAsync()
         {
             try
             {
                 var all = await _repo.GetAllAsync();
                 var pending = all
                     .Where(u => u.UserVerification != null && u.UserVerification.Verified == false)
-                    .Select(u => u.UserVerification!)
+                    .Select(u => new UserVerificationDto
+                    {
+                        VerificationId = u.UserVerification!.VerificationId,
+                        UserId = u.UserId,
+                        FullName = u.FullName,
+                        CCCD = u.UserVerification.CCCD,
+                        Address = u.UserVerification.Address,
+                        ImageUrl = u.UserVerification.ImageUrl,
+                        CreatedAt = u.UserVerification.CreatedAt
+                    })
                     .ToList();
 
                 return pending;
@@ -201,6 +210,7 @@ namespace Services.Implementations
                 throw new Exception("Lỗi khi lấy danh sách xác minh: " + ex.Message);
             }
         }
+
 
 
 
