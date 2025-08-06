@@ -26,7 +26,8 @@ namespace Services.Implementations
             {
                 ImageId = i.ImageId,
                 CostumeId = i.CostumeId,
-                ImageUrl = i.ImageUrl
+                ImageUrl = i.ImageUrl,
+                IsMain = i.IsMain
             }).ToList();
         }
 
@@ -38,7 +39,9 @@ namespace Services.Implementations
             {
                 ImageId = img.ImageId,
                 CostumeId = img.CostumeId,
-                ImageUrl = img.ImageUrl
+                ImageUrl = img.ImageUrl,
+                IsMain = img.IsMain
+
             };
         }
 
