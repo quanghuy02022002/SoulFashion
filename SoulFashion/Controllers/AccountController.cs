@@ -115,5 +115,13 @@ public class AccountController : ControllerBase
         return Ok("Xác minh thành công");
     }
 
+    [HttpPost("verification")]
+    [Authorize] // hoặc [Authorize(Roles = "customer,Collaborator")]
+    public async Task<IActionResult> SubmitVerification([FromForm] SubmitVerificationDto dto)
+    {
+        var userId = int.Parse(User.FindFirst("id")!.Value); // hoặc JwtHelper.GetUserId(User)
+        await _service.SubmitVerificationAsync(userId, dto);
+        return Ok("Đã gửi thông tin xác minh");
+    }
 
 }

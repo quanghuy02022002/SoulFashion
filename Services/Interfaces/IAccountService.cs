@@ -20,6 +20,7 @@ namespace Services.Interfaces
         Task<List<UserVerificationDto>> GetPendingVerificationsAsync();
         Task VerifyUserAsync(int userId);
 
+        Task SubmitVerificationAsync(int userId, SubmitVerificationDto dto);
 
     }
 }

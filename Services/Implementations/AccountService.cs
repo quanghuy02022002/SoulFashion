@@ -87,37 +87,17 @@ namespace Services.Implementations
 
         public async Task UpdateAsync(int userId, UpdateAccountDto dto)
         {
-            var user = await _repo.GetByIdAsync(userId) ?? throw new Exception("Không tìm thấy người dùng");
+            var user = await _repo.GetByIdAsync(userId)
+                       ?? throw new Exception("Không tìm thấy người dùng");
 
             // Cập nhật thông tin cơ bản
-            user.FullName = dto.FullName ?? user.FullName;
-            user.Phone = dto.Phone ?? user.Phone;
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName;
+
+            if (!string.IsNullOrWhiteSpace(dto.Phone))
+                user.Phone = dto.Phone;
+
             user.UpdatedAt = DateTime.UtcNow;
-
-            // Xử lý phần xác minh nếu có thông tin CCCD / địa chỉ / ảnh
-            if (!string.IsNullOrWhiteSpace(dto.CCCD) || !string.IsNullOrWhiteSpace(dto.Address) || dto.VerificationImage != null)
-            {
-                var verification = user.UserVerification ?? new UserVerification
-                {
-                    UserId = userId,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                verification.CCCD = dto.CCCD ?? verification.CCCD;
-                verification.Address = dto.Address ?? verification.Address;
-
-                if (dto.VerificationImage != null)
-                {
-                    var filename = $"verification_user_{userId}_{DateTime.UtcNow.Ticks}";
-                    var imageUrl = await _s3Service.UploadFileAsync(dto.VerificationImage, filename);
-                    verification.ImageUrl = imageUrl;
-                }
-
-                verification.Verified = false; // không cho user tự set verified
-                verification.CreatedAt = DateTime.UtcNow;
-
-                user.UserVerification = verification;
-            }
 
             await _repo.UpdateAsync(user);
         }
@@ -222,6 +202,29 @@ namespace Services.Implementations
 
             user.UserVerification.Verified = true;
             user.UserVerification.CreatedAt = DateTime.UtcNow;
+
+            await _repo.UpdateAsync(user);
+        }
+        public async Task SubmitVerificationAsync(int userId, SubmitVerificationDto dto)
+        {
+            var user = await _repo.GetByIdAsync(userId) ?? throw new Exception("Không tìm thấy người dùng");
+
+            var verification = user.UserVerification ?? new UserVerification
+            {
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            verification.CCCD = dto.CCCD;
+            verification.Address = dto.Address ?? "";
+
+            var fileName = $"verification_user_{userId}_{DateTime.UtcNow.Ticks}";
+            verification.ImageUrl = await _s3Service.UploadFileAsync(dto.VerificationImage, fileName);
+
+            verification.Verified = false;
+            verification.CreatedAt = DateTime.UtcNow;
+
+            user.UserVerification = verification;
 
             await _repo.UpdateAsync(user);
         }
