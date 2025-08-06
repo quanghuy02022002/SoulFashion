@@ -37,6 +37,20 @@ namespace Repositories.Implementations
             await _context.SaveChangesAsync();
             return image;
         }
+        public async Task UnsetMainImageAsync(int costumeId)
+        {
+            var mainImages = _context.CostumeImages
+                .Where(i => i.CostumeId == costumeId && i.IsMain);
+
+            foreach (var img in mainImages)
+            {
+                img.IsMain = false;
+                img.UpdatedAt = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
 
         public async Task<bool> DeleteAsync(int id)
         {

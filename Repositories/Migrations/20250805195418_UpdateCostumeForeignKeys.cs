@@ -10,17 +10,9 @@ namespace Repositories.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK__Costumes__OwnerI__48CFD27E",
-                table: "Costumes");
+        
+       
 
-            migrationBuilder.DropIndex(
-                name: "IX_Costumes_OwnerId",
-                table: "Costumes");
-
-            migrationBuilder.DropColumn(
-                name: "OwnerId",
-                table: "Costumes");
 
             migrationBuilder.AlterColumn<int>(
                 name: "Quantity",

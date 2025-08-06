@@ -17,6 +17,8 @@ namespace Repositories.DTOs
         [Required]
         [Url]
         public string ImageUrl { get; set; }
+        public bool IsMain { get; set; } = false; // ➕ Thêm dòng này
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; } = DateTime.Now;
     }

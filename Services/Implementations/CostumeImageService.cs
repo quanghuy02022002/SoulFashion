@@ -48,6 +48,7 @@ namespace Services.Implementations
             {
                 CostumeId = dto.CostumeId,
                 ImageUrl = dto.ImageUrl,
+                IsMain = dto.IsMain, // ➕ Thêm dòng này
                 CreatedAt = DateTime.Now
             };
             var saved = await _repository.AddAsync(image);

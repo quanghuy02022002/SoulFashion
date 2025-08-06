@@ -12,6 +12,8 @@ namespace Repositories.Interfaces
         Task<List<CostumeImage>> GetByCostumeIdAsync(int costumeId);
         Task<CostumeImage?> GetByIdAsync(int id);
         Task<CostumeImage> AddAsync(CostumeImage image);
+        Task UnsetMainImageAsync(int costumeId);
+
         Task<bool> DeleteAsync(int id);
     }
 }

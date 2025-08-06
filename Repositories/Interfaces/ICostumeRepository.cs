@@ -16,5 +16,6 @@ namespace Repositories.Interfaces
         Task<Costume> AddAsync(Costume costume);
         Task<Costume> UpdateAsync(Costume costume);
         Task<bool> DeleteAsync(int id);
+
     }
 }
