@@ -10,6 +10,7 @@ namespace Repositories.Interfaces
         Task<IEnumerable<CartItem>> GetByUserIdAsync(int userId);
         Task<CartItem?> GetByUserAndCostumeAsync(int userId, int costumeId);
         Task<CartItem> AddAsync(CartItem item);
+        Task<CartItem?> GetByIdAsync(int cartItemId); // ⬅ cần cho update
         Task UpdateAsync(CartItem item);
         Task DeleteAsync(int cartItemId);
     }

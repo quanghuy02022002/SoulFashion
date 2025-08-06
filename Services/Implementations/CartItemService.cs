@@ -47,6 +47,15 @@ namespace Services.Implementations
 
             return await _repository.AddAsync(newItem);
         }
+        public async Task<CartItem> UpdateCartItemQuantityAsync(int cartItemId, int newQuantity)
+        {
+            var item = await _repository.GetByIdAsync(cartItemId);
+            if (item == null) throw new Exception("❌ CartItem không tồn tại.");
+
+            item.Quantity = newQuantity;
+            await _repository.UpdateAsync(item);
+            return item;
+        }
 
         public async Task DeleteCartItemAsync(int cartItemId)
         {

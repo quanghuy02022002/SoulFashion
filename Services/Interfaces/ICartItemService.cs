@@ -9,6 +9,7 @@ namespace Services.Interfaces
         Task<IEnumerable<CartItem>> GetAllCartItemsAsync();
         Task<IEnumerable<CartItem>> GetCartItemsByUserAsync(int userId);
         Task<CartItem> AddOrUpdateCartItemAsync(int userId, int costumeId, int quantity);
+        Task<CartItem> UpdateCartItemQuantityAsync(int cartItemId, int newQuantity);
         Task DeleteCartItemAsync(int cartItemId);
     }
 }

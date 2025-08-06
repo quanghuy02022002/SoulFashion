@@ -31,6 +31,7 @@ namespace Repositories.Implementations
                 .Include(x => x.Costume)
                 .ToListAsync();
         }
+        
 
         public async Task<CartItem?> GetByUserAndCostumeAsync(int userId, int costumeId)
         {
@@ -59,6 +60,14 @@ namespace Repositories.Implementations
                 _context.CartItems.Remove(item);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public Task<CartItem?> GetByIdAsync(int cartItemId)
+        {
+            return _context.CartItems
+                .Include(x => x.Costume)
+                .Include(x => x.User)
+                .FirstOrDefaultAsync(x => x.CartItemId == cartItemId);
         }
     }
 }

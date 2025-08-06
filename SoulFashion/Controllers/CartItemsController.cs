@@ -61,7 +61,19 @@ namespace SoulFashion.Controllers
                 return StatusCode(500, $"Lỗi khi thêm/cập nhật CartItem: {ex.Message}");
             }
         }
-
+        [HttpPut("{cartItemId}")]
+        public async Task<IActionResult> UpdateQuantity(int cartItemId, [FromBody] int newQuantity)
+        {
+            try
+            {
+                var updated = await _service.UpdateCartItemQuantityAsync(cartItemId, newQuantity);
+                return Ok(updated);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi cập nhật số lượng: {ex.Message}");
+            }
+        }
         // ✅ Xoá item khỏi cart
         [HttpDelete("{cartItemId}")]
         public async Task<IActionResult> Delete(int cartItemId)
