@@ -18,14 +18,29 @@ namespace Repositories.Implementations
             _context = context;
         }
 
-        public Task<List<User>> GetAllAsync()
-            => _context.Users.ToListAsync();
+        public async Task<List<User>> GetAllAsync()
+        {
+            return await _context.Users
+                .Include(u => u.UserVerification)
+                .ToListAsync();
+        }
+
 
         public Task<User?> GetByIdAsync(int id)
-            => _context.Users.FindAsync(id).AsTask();
+        {
+            return _context.Users
+                .Include(u => u.UserVerification)
+                .FirstOrDefaultAsync(u => u.UserId == id);
+        }
+
 
         public Task<User?> GetByEmailAsync(string email)
-            => _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        {
+            return _context.Users
+                .Include(u => u.UserVerification)
+                .FirstOrDefaultAsync(u => u.Email == email);
+        }
+
 
         public async Task AddAsync(User user)
         {

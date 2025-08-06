@@ -12,8 +12,9 @@ namespace Services.Interfaces
         Task UpdateAsync(int userId, UpdateAccountDto dto);
         Task<string> UpdateAvatarAsync(int userId, IFormFile avatar); // 👈 Avatar riêng biệt
         Task ChangePasswordAsync(ChangePasswordDto dto);
-        Task<List<User>> GetAllAsync();
-        Task<User?> GetByIdAsync(int id);
+        Task<List<UserDto>> GetAllAsync();
+        Task<UserDto?> GetByIdAsync(int id);
+
         Task DeleteAsync(int id);
         Task ChangeRoleAsync(int userId, string newRole);
         Task<List<UserVerification>> GetPendingVerificationsAsync();

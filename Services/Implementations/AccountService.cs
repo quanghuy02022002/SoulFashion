@@ -12,6 +12,23 @@ namespace Services.Implementations
         private readonly IUserRepository _repo;
         private readonly TokenService _tokenService;
         private readonly IS3Service _s3Service;
+        private static UserDto MapToDto(User user)
+        {
+            return new UserDto
+            {
+                UserId = user.UserId,
+                FullName = user.FullName,
+                Email = user.Email,
+                Phone = user.Phone,
+                AvatarUrl = user.AvatarUrl,
+                Role = user.Role,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt,
+                CCCD = user.UserVerification?.CCCD,
+                Address = user.UserVerification?.Address,
+                Verified = user.UserVerification?.Verified
+            };
+        }
 
         public AccountService(IUserRepository repo, TokenService tokenService, IS3Service s3Service)
         {
@@ -131,9 +148,17 @@ namespace Services.Implementations
             await _repo.SaveAsync();
         }
 
-        public Task<List<User>> GetAllAsync() => _repo.GetAllAsync();
+        public async Task<List<UserDto>> GetAllAsync()
+        {
+            var users = await _repo.GetAllAsync();
+            return users.Select(MapToDto).ToList();
+        }
 
-        public Task<User?> GetByIdAsync(int id) => _repo.GetByIdAsync(id);
+        public async Task<UserDto?> GetByIdAsync(int id)
+        {
+            var user = await _repo.GetByIdAsync(id);
+            return user == null ? null : MapToDto(user);
+        }
 
         public async Task DeleteAsync(int id)
         {
