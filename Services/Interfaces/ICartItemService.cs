@@ -11,5 +11,7 @@ namespace Services.Interfaces
         Task<CartItem> AddOrUpdateCartItemAsync(int userId, int costumeId, int quantity);
         Task<CartItem> UpdateCartItemQuantityAsync(int cartItemId, int newQuantity);
         Task DeleteCartItemAsync(int cartItemId);
+        Task DeleteAllCartItemsByUserAsync(int userId);
+
     }
 }

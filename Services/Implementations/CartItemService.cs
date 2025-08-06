@@ -61,5 +61,10 @@ namespace Services.Implementations
         {
             await _repository.DeleteAsync(cartItemId);
         }
+        public async Task DeleteAllCartItemsByUserAsync(int userId)
+        {
+            await _repository.DeleteAllByUserIdAsync(userId);
+        }
+
     }
 }

@@ -13,5 +13,7 @@ namespace Repositories.Interfaces
         Task<CartItem?> GetByIdAsync(int cartItemId); // ⬅ cần cho update
         Task UpdateAsync(CartItem item);
         Task DeleteAsync(int cartItemId);
+        Task DeleteAllByUserIdAsync(int userId);
+
     }
 }

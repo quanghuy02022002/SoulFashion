@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Repositories.Models;
+using Services.Implementations;
 using Services.Interfaces;
 using System;
 using System.Threading.Tasks;
@@ -88,5 +89,19 @@ namespace SoulFashion.Controllers
                 return StatusCode(500, $"Lỗi khi xoá CartItem: {ex.Message}");
             }
         }
+        [HttpDelete("user/{userId}")]
+        public async Task<IActionResult> DeleteAll(int userId)
+        {
+            try
+            {
+                await _service.DeleteAllCartItemsByUserAsync(userId);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi xoá toàn bộ giỏ hàng: {ex.Message}");
+            }
+        }
+
     }
 }

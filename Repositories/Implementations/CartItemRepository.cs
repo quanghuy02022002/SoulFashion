@@ -69,5 +69,12 @@ namespace Repositories.Implementations
                 .Include(x => x.User)
                 .FirstOrDefaultAsync(x => x.CartItemId == cartItemId);
         }
+        public async Task DeleteAllByUserIdAsync(int userId)
+        {
+            var items = await _context.CartItems.Where(x => x.UserId == userId).ToListAsync();
+            _context.CartItems.RemoveRange(items);
+            await _context.SaveChangesAsync();
+        }
+
     }
 }
