@@ -186,12 +186,20 @@ namespace Services.Implementations
         }
         public async Task<List<UserVerification>> GetPendingVerificationsAsync()
         {
-            var all = await _repo.GetAllAsync();
-            return all
-                .Where(u => u.UserVerification != null && u.UserVerification.Verified == false)
-                .Select(u => u.UserVerification)
-                .ToList();
+            try
+            {
+                var all = await _repo.GetAllAsync();
+                return all
+                    .Where(u => u.UserVerification != null && u.UserVerification.Verified == false)
+                    .Select(u => u.UserVerification!) // thêm dấu ! để nói với compiler là không null
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi khi lấy danh sách xác minh: " + ex.Message);
+            }
         }
+
 
         public async Task VerifyUserAsync(int userId)
         {
