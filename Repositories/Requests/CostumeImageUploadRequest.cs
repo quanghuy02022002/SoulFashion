@@ -17,6 +17,7 @@ namespace Repositories.Requests
         [Required]
         public IFormFile File { get; set; }
         public string? FileName { get; set; }
+        public bool IsMain { get; set; } = false;
 
     }
 }

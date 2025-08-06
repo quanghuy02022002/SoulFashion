@@ -46,7 +46,8 @@ public class CostumeImageController : ControllerBase
         var dto = new CostumeImageDTO
         {
             CostumeId = request.CostumeId,
-            ImageUrl = url
+            ImageUrl = url,
+            IsMain = request.IsMain
         };
 
         try
