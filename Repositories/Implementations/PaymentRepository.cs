@@ -52,17 +52,7 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Payment payment)
         {
-            // Nếu entity chưa được tracking, attach vào context
-            var isTracked = _context.ChangeTracker
-                                    .Entries<Payment>()
-                                    .Any(e => e.Entity.PaymentId == payment.PaymentId);
-
-            if (!isTracked)
-            {
-                _context.Payments.Attach(payment);
-            }
-
-            // Đánh dấu các field cần cập nhật
+            _context.Attach(payment);
             _context.Entry(payment).Property(p => p.PaymentStatus).IsModified = true;
             _context.Entry(payment).Property(p => p.PaidAt).IsModified = true;
             _context.Entry(payment).Property(p => p.UpdatedAt).IsModified = true;
@@ -70,5 +60,6 @@ namespace Repositories.Implementations
 
             await _context.SaveChangesAsync();
         }
+
     }
 }

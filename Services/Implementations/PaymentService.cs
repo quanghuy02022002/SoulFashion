@@ -67,24 +67,18 @@ namespace Services.Implementations
 
         public async Task MarkAsPaid(string txnRef)
         {
-            if (string.IsNullOrWhiteSpace(txnRef))
-                throw new ArgumentException("Transaction reference cannot be empty");
-
             var payment = await _repo.GetByTxnRefAsync(txnRef);
-            if (payment == null)
-                throw new Exception($"Payment not found for transactionRef: {txnRef}");
+            if (payment == null) throw new Exception("Payment not found");
 
-            if (payment.PaymentStatus == "paid")
-                return; // Đã thanh toán rồi thì bỏ qua
+            if (payment.PaymentStatus == "paid") return;
 
-            // 1️⃣ Cập nhật Payment
             payment.PaymentStatus = "paid";
             payment.PaidAt = DateTime.Now;
             payment.UpdatedAt = DateTime.Now;
-            await _repo.UpdateAsync(payment);
 
-            // 2️⃣ Gọi OrderService để cập nhật Order đầy đủ
+            await _repo.UpdateAsync(payment);
             await _orderService.MarkOrderAsPaidAsync(payment.OrderId, payment.PaymentMethod ?? "unknown");
         }
+
     }
 }

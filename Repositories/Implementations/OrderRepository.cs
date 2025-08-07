@@ -48,25 +48,17 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Order order)
         {
-            // Update order chính
-            _context.Orders.Update(order);
+            _context.Attach(order);
+            _context.Entry(order).Property(o => o.Status).IsModified = true;
+            _context.Entry(order).Property(o => o.IsPaid).IsModified = true;
+            _context.Entry(order).Property(o => o.UpdatedAt).IsModified = true;
 
-            // Đảm bảo navigation Deposit được update
             if (order.Deposit != null)
             {
-                _context.Entry(order.Deposit).State = EntityState.Modified;
-            }
-
-            // Đảm bảo thêm mới status histories nếu có
-            if (order.StatusHistories != null)
-            {
-                foreach (var history in order.StatusHistories)
-                {
-                    if (history.HistoryId == 0) // mới thêm
-                    {
-                        _context.OrderStatusHistories.Add(history);
-                    }
-                }
+                _context.Attach(order.Deposit);
+                _context.Entry(order.Deposit).Property(d => d.DepositStatus).IsModified = true;
+                _context.Entry(order.Deposit).Property(d => d.PaymentMethod).IsModified = true;
+                _context.Entry(order.Deposit).Property(d => d.UpdatedAt).IsModified = true;
             }
 
             await _context.SaveChangesAsync();

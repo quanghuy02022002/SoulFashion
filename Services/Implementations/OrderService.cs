@@ -302,33 +302,32 @@ namespace Services.Implementations
 
         public async Task MarkOrderAsPaidAsync(int orderId, string paymentMethod)
         {
-            // Lấy đủ navigation
-            var order = await _orderRepository.GetByIdAsync(orderId);
-            if (order == null) throw new Exception("Order not found");
-
-            // Cập nhật order
-            order.Status = "confirmed";
-            order.IsPaid = true;
-
-            if (order.Deposit != null)
+            var order = new Order
             {
-                order.Deposit.DepositStatus = "paid";
-                order.Deposit.PaymentMethod = paymentMethod;
-                order.Deposit.UpdatedAt = DateTime.Now;
-            }
+                OrderId = orderId,
+                Status = "confirmed",
+                IsPaid = true,
+                UpdatedAt = DateTime.Now,
+                Deposit = new Deposit
+                {
+                    OrderId = orderId,
+                    DepositStatus = "paid",
+                    PaymentMethod = paymentMethod,
+                    UpdatedAt = DateTime.Now
+                }
+            };
 
-            order.StatusHistories.Add(new OrderStatusHistory
+            await _orderRepository.UpdateAsync(order);
+
+            await _statusHistoryRepository.CreateAsync(new OrderStatusHistory
             {
-                OrderId = order.OrderId,
+                OrderId = orderId,
                 Status = "confirmed",
                 Note = "Thanh toán thành công qua " + paymentMethod,
                 ChangedAt = DateTime.Now
             });
-
-            order.UpdatedAt = DateTime.Now;
-
-            await _orderRepository.UpdateAsync(order);
         }
+
 
 
     }
