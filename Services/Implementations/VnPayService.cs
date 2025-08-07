@@ -12,7 +12,6 @@ namespace Services.Implementations
     using Repositories.Interfaces;
     using Services.Interfaces;
     using System.Security.Cryptography;
-    using System.Text;
     using System.Web;
 
     public class VnPayService : IVnPayService
@@ -37,33 +36,34 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
+            // Tạo dictionary tham số và sắp xếp theo key
             var vnp_Params = new SortedDictionary<string, string>
-    {
-        { "vnp_Version", "2.1.0" },
-        { "vnp_Command", "pay" },
-        { "vnp_TmnCode", tmnCode },
-        { "vnp_Amount", ((int)(order.TotalPrice.Value * 100)).ToString() },
-        { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
-        { "vnp_CurrCode", "VND" },
-        { "vnp_IpAddr", ipAddress },
-        { "vnp_Locale", "vn" },
-        { "vnp_OrderInfo", $"Thanh toán đơn hàng #{order.OrderId}" },
-        { "vnp_OrderType", "other" },
-        { "vnp_ReturnUrl", returnUrl },
-        { "vnp_TxnRef", txnRef }
-    };
+            {
+                { "vnp_Version", "2.1.0" },
+                { "vnp_Command", "pay" },
+                { "vnp_TmnCode", tmnCode },
+                { "vnp_Amount", ((int)(order.TotalPrice.Value * 100)).ToString() },
+                { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
+                { "vnp_CurrCode", "VND" },
+                { "vnp_IpAddr", ipAddress },
+                { "vnp_Locale", "vn" },
+                { "vnp_OrderInfo", $"Thanh toán đơn hàng #{order.OrderId}" },
+                { "vnp_OrderType", "other" },
+                { "vnp_ReturnUrl", returnUrl },
+                { "vnp_TxnRef", txnRef }
+            };
 
-            // B1: Tạo rawData để ký (không encode)
+            // B1: Tạo chuỗi dữ liệu ký
             var signData = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={kv.Value}"));
 
-            // B2: Tạo hash
+            // B2: Tạo chữ ký HMAC SHA512
             var hash = ComputeHmacSha512(secretKey, signData);
 
-            // B3: Thêm SecureHash
+            // B3: Thêm SecureHash vào tham số
             vnp_Params.Add("vnp_SecureHashType", "HMACSHA512");
             vnp_Params.Add("vnp_SecureHash", hash);
 
-            // B4: Tạo URL encode
+            // B4: Encode các giá trị khi tạo URL
             var finalQuery = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
             return $"{baseUrl}?{finalQuery}";
         }
@@ -77,42 +77,30 @@ namespace Services.Implementations
             }
         }
 
-
         public bool ValidateResponse(IQueryCollection vnpParams, out string txnRef)
         {
             txnRef = vnpParams["vnp_TxnRef"];
 
-            if (txnRef?.StartsWith("TXN") == true)
-                return true;
-
-            if (!vnpParams.ContainsKey("vnp_SecureHash")) return false;
+            if (!vnpParams.ContainsKey("vnp_SecureHash"))
+                return false;
 
             var hashSecret = _config["VnPay:HashSecret"];
             var secureHash = vnpParams["vnp_SecureHash"].ToString();
 
+            // Lấy toàn bộ tham số trừ SecureHash và SecureHashType, sắp xếp theo key
             var sortedParams = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .OrderBy(kv => kv.Key)
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
+            // Tạo chuỗi ký
             string signData = string.Join("&", sortedParams.Select(kv => $"{kv.Key}={kv.Value}"));
-            string computedHash = ComputeHash(hashSecret + signData);
 
-            if (computedHash == secureHash.ToUpper())
-            {
-                txnRef = sortedParams["vnp_TxnRef"];
-                return true;
-            }
+            // Tính hash
+            string computedHash = ComputeHmacSha512(hashSecret, signData);
 
-            return false;
-        }
-
-        private string ComputeHash(string input)
-        {
-            using var sha256 = SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes(input);
-            var hash = sha256.ComputeHash(bytes);
-            return BitConverter.ToString(hash).Replace("-", "").ToUpper();
+            // So sánh chữ ký
+            return string.Equals(computedHash, secureHash, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
