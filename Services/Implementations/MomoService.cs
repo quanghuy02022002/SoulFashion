@@ -4,24 +4,30 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Repositories.DTOs;
+using Repositories.Interfaces;
 using Services.Interfaces;
 
 namespace Services.Implementations
 {
-
     public class MomoService : IMomoService
     {
         private readonly IConfiguration _config;
         private readonly HttpClient _http;
+        private readonly IOrderRepository _orderRepo;
 
-        public MomoService(IConfiguration config)
+        public MomoService(IConfiguration config, IOrderRepository orderRepo)
         {
             _config = config;
             _http = new HttpClient();
+            _orderRepo = orderRepo;
         }
 
         public async Task<string> CreatePaymentAsync(PaymentDto dto, string txnRef)
         {
+            var order = await _orderRepo.GetByIdAsync(dto.OrderId);
+            if (order == null || order.TotalPrice == null)
+                throw new Exception("Không tìm thấy đơn hàng hoặc đơn hàng không có tổng giá.");
+
             var endpoint = _config["Momo:ApiEndpoint"];
             var partnerCode = _config["Momo:PartnerCode"];
             var accessKey = _config["Momo:AccessKey"];
@@ -29,8 +35,8 @@ namespace Services.Implementations
             var returnUrl = _config["Momo:ReturnUrl"];
             var notifyUrl = _config["Momo:NotifyUrl"];
 
+            var amount = order.TotalPrice.Value.ToString("0");
             var orderInfo = $"Thanh toán đơn hàng #{dto.OrderId}";
-            var amount = dto.Amount.ToString("0");
             var requestId = txnRef;
             var orderId = txnRef;
             var requestType = "captureWallet";

@@ -9,6 +9,7 @@ namespace Services.Implementations
     using Microsoft.AspNetCore.Http;
     using Microsoft.Extensions.Configuration;
     using Repositories.DTOs;
+    using Repositories.Interfaces;
     using Services.Interfaces;
     using System.Security.Cryptography;
     using System.Text;
@@ -17,34 +18,40 @@ namespace Services.Implementations
     public class VnPayService : IVnPayService
     {
         private readonly IConfiguration _config;
+        private readonly IOrderRepository _orderRepo;
 
-        public VnPayService(IConfiguration config)
+        public VnPayService(IConfiguration config, IOrderRepository orderRepo)
         {
             _config = config;
+            _orderRepo = orderRepo;
         }
 
         public string CreatePaymentUrl(PaymentDto dto, string ipAddress, string txnRef)
         {
+            var order = _orderRepo.GetByIdAsync(dto.OrderId).Result;
+            if (order == null || order.TotalPrice == null)
+                throw new Exception("Không tìm thấy đơn hàng hoặc đơn hàng không có tổng giá.");
+
             var tmnCode = _config["VnPay:TmnCode"];
             var secretKey = _config["VnPay:HashSecret"];
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
             var vnp_Params = new SortedDictionary<string, string>
-        {
-            { "vnp_Version", "2.1.0" },
-            { "vnp_Command", "pay" },
-            { "vnp_TmnCode", tmnCode },
-            { "vnp_Amount", ((int)(dto.Amount * 100)).ToString() }, // VNPAY yêu cầu nhân 100
-            { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
-            { "vnp_CurrCode", "VND" },
-            { "vnp_IpAddr", ipAddress },
-            { "vnp_Locale", "vn" },
-            { "vnp_OrderInfo", $"Thanh toán đơn hàng #{dto.OrderId}" },
-            { "vnp_OrderType", "other" },
-            { "vnp_ReturnUrl", returnUrl },
-            { "vnp_TxnRef", txnRef }
-        };
+            {
+                { "vnp_Version", "2.1.0" },
+                { "vnp_Command", "pay" },
+                { "vnp_TmnCode", tmnCode },
+                { "vnp_Amount", ((int)(order.TotalPrice.Value * 100)).ToString() }, // ✅ nhân 100
+                { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
+                { "vnp_CurrCode", "VND" },
+                { "vnp_IpAddr", ipAddress },
+                { "vnp_Locale", "vn" },
+                { "vnp_OrderInfo", $"Thanh toán đơn hàng #{order.OrderId}" },
+                { "vnp_OrderType", "other" },
+                { "vnp_ReturnUrl", returnUrl },
+                { "vnp_TxnRef", txnRef }
+            };
 
             var signData = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={kv.Value}"));
             var hash = ComputeHash(secretKey + signData);
@@ -60,11 +67,9 @@ namespace Services.Implementations
         {
             txnRef = vnpParams["vnp_TxnRef"];
 
-            // ⚠️ Nếu đang test không có chữ ký thật, cho phép pass:
             if (txnRef?.StartsWith("TXN") == true)
                 return true;
 
-            // Phần bên dưới vẫn giữ nguyên cho môi trường thật:
             if (!vnpParams.ContainsKey("vnp_SecureHash")) return false;
 
             var hashSecret = _config["VnPay:HashSecret"];
@@ -95,5 +100,4 @@ namespace Services.Implementations
             return BitConverter.ToString(hash).Replace("-", "").ToUpper();
         }
     }
-
 }

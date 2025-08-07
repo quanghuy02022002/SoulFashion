@@ -21,16 +21,19 @@ namespace Services.Implementations
             _orderRepo = orderRepo;
         }
 
-
         public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId) =>
             await _repo.GetByOrderIdAsync(orderId);
 
         public async Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef)
         {
+            // 🔍 Tự động lấy tổng tiền từ đơn hàng
+            var order = await _orderRepo.GetByIdAsync(dto.OrderId);
+            if (order == null) throw new Exception("Order not found");
+
             var payment = new Payment
-            {   
+            {
                 OrderId = dto.OrderId,
-                Amount = dto.Amount,
+                Amount = order.TotalPrice ?? throw new Exception("Order.TotalPrice is null"),
                 PaymentMethod = dto.PaymentMethod.ToLower(),
                 PaymentStatus = dto.PaymentStatus.ToLower(),
                 TransactionCode = txnRef,
@@ -62,7 +65,5 @@ namespace Services.Implementations
                 }
             }
         }
-
     }
-
 }
