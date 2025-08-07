@@ -69,6 +69,8 @@ namespace Services.Implementations
                 RecipientName = dto.RecipientName,
                 RecipientPhone = dto.RecipientPhone,
                 ShippingAddress = dto.ShippingAddress,
+                HasIdentityCard = dto.HasIdentityCard, // 🟢 THÊM DÒNG NÀY
+
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
