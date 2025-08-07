@@ -29,18 +29,19 @@ namespace Services.Implementations
         public string CreatePaymentUrl(PaymentDto dto, string ipAddress, string txnRef)
         {
             var order = _orderRepo.GetByIdAsync(dto.OrderId).Result;
-            if (order == null || order.TotalPrice == null)
-                throw new Exception("Không tìm thấy đơn hàng hoặc đơn hàng không có tổng giá.");
+            if (order is null || order.TotalPrice is null)
+                throw new Exception("Không tìm thấy đơn hàng hoặc tổng giá chưa có.");
 
             var tmnCode = _config["VnPay:TmnCode"];
-            var secret = _config["VnPay:HashSecret"];
+            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();   // tránh ký tự thừa
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
             var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
-            var p = new Dictionary<string, string>
+            // Tập tham số gốc (đừng thêm value rỗng)
+            var p = new Dictionary<string, string?>
             {
                 ["vnp_Version"] = "2.1.0",
                 ["vnp_Command"] = "pay",
@@ -55,7 +56,8 @@ namespace Services.Implementations
                 ["vnp_OrderType"] = "other",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
-                ["vnp_SecureHashType"] = "HMACSHA512"
+                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
+                // ["vnp_BankCode"]  = dto.BankCode  // nếu có và không rỗng hãy thêm
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -66,14 +68,16 @@ namespace Services.Implementations
         {
             txnRef = vnpParams["vnp_TxnRef"];
 
-            if (!vnpParams.ContainsKey("vnp_SecureHash"))
-                return false;
+            if (!vnpParams.ContainsKey("vnp_SecureHash")) return false;
 
-            var secret = _config["VnPay:HashSecret"];
-            var secureHashFromVnp = vnpParams["vnp_SecureHash"].ToString();
+            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
+            var fromVnp = vnpParams["vnp_SecureHash"].ToString();
 
+            // Lọc đúng tập vnp_* và bỏ hash/type khỏi dữ liệu ký
             var data = vnpParams
-                .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+                .Where(kv => kv.Key.StartsWith("vnp_", StringComparison.Ordinal))
+                .Where(kv => kv.Key is not "vnp_SecureHash" && kv.Key is not "vnp_SecureHashType")
+                .Where(kv => !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
             var signData = BuildDataToSign(data);
@@ -81,73 +85,47 @@ namespace Services.Implementations
 
             _logger.LogInformation("[VNPay RETURN] signData={signData}", signData);
             _logger.LogInformation("[VNPay RETURN] computed={computed}", computed);
-            _logger.LogInformation("[VNPay RETURN] fromVNPay={fromVNPay}", secureHashFromVnp);
+            _logger.LogInformation("[VNPay RETURN] fromVNPay={fromVNPay}", fromVnp);
 
-            return computed.Equals(secureHashFromVnp, StringComparison.InvariantCultureIgnoreCase);
+            return computed.Equals(fromVnp, StringComparison.InvariantCultureIgnoreCase);
         }
 
-        private string BuildSignedQuery(IDictionary<string, string> rawParams, string secret)
-        {
-            var sorted = new SortedDictionary<string, string>(
-                rawParams.Where(kv => !string.IsNullOrEmpty(kv.Value))
-                         .ToDictionary(kv => kv.Key, kv => kv.Value),
-                StringComparer.Ordinal);
+        // ================= Helpers =================
 
-            var signData = BuildDataToSign(sorted);
+        private string BuildSignedQuery(IDictionary<string, string?> rawParams, string secret)
+        {
+            // Bỏ key rỗng/value rỗng
+            var cleaned = rawParams
+                .Where(kv => !string.IsNullOrEmpty(kv.Key) && !string.IsNullOrEmpty(kv.Value))
+                .ToDictionary(kv => kv.Key!, kv => kv.Value!);
+
+            var signData = BuildDataToSign(cleaned);
             var secureHash = ComputeHmacSha512(secret, signData);
 
             _logger.LogInformation("[VNPay SEND] signData={signData}", signData);
             _logger.LogInformation("[VNPay SEND] secureHash={secureHash}", secureHash);
 
-            var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={UrlEncodeVnPay(kv.Value)}");
-
-            var query = string.Join("&", encodedPairs);
-            query += $"&vnp_SecureHash={secureHash}";
-            return query;
+            var sorted = new SortedDictionary<string, string>(cleaned, StringComparer.Ordinal);
+            var query = string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
+            return $"{query}&vnp_SecureHash={secureHash}";
         }
 
+        /// Tạo chuỗi ký: key=UrlEncode(value)&..., sắp xếp theo tên key (Ordinal)
         private static string BuildDataToSign(IDictionary<string, string> parameters)
         {
-            var sorted = new SortedDictionary<string, string>(
-                parameters.Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                          .Where(kv => !string.IsNullOrEmpty(kv.Value))
-                          .ToDictionary(kv => kv.Key, kv => kv.Value),
-                StringComparer.Ordinal);
-
-            var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={UrlEncodeVnPay(kv.Value)}");
-
-            return string.Join("&", encodedPairs);
+            var sorted = new SortedDictionary<string, string>(parameters, StringComparer.Ordinal);
+            return string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
         }
 
-        private static string UrlEncodeVnPay(string value)
-        {
-            var encoded = HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
-            var sb = new StringBuilder(encoded.Length);
-            for (int i = 0; i < encoded.Length; i++)
-            {
-                char c = encoded[i];
-                if (c == '%' && i + 2 < encoded.Length)
-                {
-                    sb.Append('%');
-                    sb.Append(char.ToLowerInvariant(encoded[i + 1]));
-                    sb.Append(char.ToLowerInvariant(encoded[i + 2]));
-                    i += 2;
-                }
-                else
-                {
-                    sb.Append(c);
-                }
-            }
-            return sb.ToString();
-        }
+        /// Encode theo application/x-www-form-urlencoded (space -> '+', HEX **chữ HOA**)
+        private static string FormEncode(string value) =>
+            HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
 
         private static string ComputeHmacSha512(string key, string data)
         {
-            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key ?? ""));
-            var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data ?? ""));
-            return BitConverter.ToString(hashValue).Replace("-", "").ToUpperInvariant();
+            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key ?? string.Empty));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data ?? string.Empty));
+            return BitConverter.ToString(hash).Replace("-", "").ToUpperInvariant();
         }
     }
 }
