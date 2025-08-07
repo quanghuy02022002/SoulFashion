@@ -13,6 +13,7 @@ namespace Repositories.Interfaces
         Task<CostumeImage?> GetByIdAsync(int id);
         Task<CostumeImage> AddAsync(CostumeImage image);
         Task UnsetMainImageAsync(int costumeId);
+        Task UpdateAsync(CostumeImage image);
 
         Task<bool> DeleteAsync(int id);
     }

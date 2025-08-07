@@ -60,6 +60,16 @@ public class CostumeImageController : ControllerBase
             return StatusCode(500, $"Upload failed: {ex.Message} - Inner: {ex.InnerException?.Message}");
         }
     }
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] CostumeImageDTO dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var updated = await _service.UpdateAsync(id, dto);
+        if (updated == null) return NotFound();
+
+        return Ok(updated);
+    }
 
 
 

@@ -51,6 +51,11 @@ namespace Repositories.Implementations
             await _context.SaveChangesAsync();
         }
 
+        public async Task UpdateAsync(CostumeImage image)
+        {
+            _context.CostumeImages.Update(image);
+            await _context.SaveChangesAsync();
+        }
 
         public async Task<bool> DeleteAsync(int id)
         {

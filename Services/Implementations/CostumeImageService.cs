@@ -58,6 +58,29 @@ namespace Services.Implementations
             dto.ImageId = saved.ImageId;
             return dto;
         }
+        public async Task<CostumeImageDTO?> UpdateAsync(int id, CostumeImageDTO dto)
+        {
+            var existing = await _repository.GetByIdAsync(id);
+            if (existing == null) return null;
+
+            if (dto.IsMain)
+            {
+                await _repository.UnsetMainImageAsync(existing.CostumeId);
+            }
+
+            existing.ImageUrl = dto.ImageUrl;
+            existing.IsMain = dto.IsMain;
+            existing.UpdatedAt = DateTime.Now;
+
+            await _repository.UpdateAsync(existing);
+
+            dto.ImageId = existing.ImageId;
+            dto.CostumeId = existing.CostumeId;
+            dto.CreatedAt = existing.CreatedAt;
+            dto.UpdatedAt = existing.UpdatedAt;
+
+            return dto;
+        }
 
         public async Task<bool> DeleteAsync(int id)
         {

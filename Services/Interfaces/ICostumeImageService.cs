@@ -12,6 +12,8 @@ namespace Services.Interfaces
         Task<List<CostumeImageDTO>> GetByCostumeIdAsync(int costumeId);
         Task<CostumeImageDTO?> GetByIdAsync(int id);
         Task<CostumeImageDTO> AddAsync(CostumeImageDTO dto);
+        Task<CostumeImageDTO?> UpdateAsync(int id, CostumeImageDTO dto);
+
         Task<bool> DeleteAsync(int id);
     }
 }
