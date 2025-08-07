@@ -1,14 +1,14 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Repositories.DTOs;
-using Repositories.Interfaces;
-using Services.Interfaces;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Repositories.DTOs;
+using Repositories.Interfaces;
+using Services.Interfaces;
 
 namespace Services.Implementations
 {
@@ -34,7 +34,7 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
-            // Dùng giờ Việt Nam (UTC+7)
+            // Giờ VN (UTC+7) + hết hạn 15'
             var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
@@ -43,7 +43,7 @@ namespace Services.Implementations
                 ["vnp_Version"] = "2.1.0",
                 ["vnp_Command"] = "pay",
                 ["vnp_TmnCode"] = tmnCode,
-                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(), // VND x100
+                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(),
                 ["vnp_CreateDate"] = now.ToString("yyyyMMddHHmmss"),
                 ["vnp_ExpireDate"] = expire.ToString("yyyyMMddHHmmss"),
                 ["vnp_CurrCode"] = "VND",
@@ -53,8 +53,7 @@ namespace Services.Implementations
                 ["vnp_OrderType"] = "other",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
-                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG đưa vào chuỗi ký
-                // ["vnp_BankCode"]   = "VNPAYQR" // tuỳ chọn
+                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -71,16 +70,18 @@ namespace Services.Implementations
             var secret = _config["VnPay:HashSecret"];
             var secureHashFromVnp = vnpParams["vnp_SecureHash"].ToString();
 
-            // Lấy tất cả param (trừ hash & type), encode y như lúc gửi rồi ký lại
+            // Build lại signData y hệt cách gửi đi (encode + hex thường)
             var data = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
             var signData = BuildDataToSign(data);
             var computed = ComputeHmacSha512(secret, signData);
-            Console.WriteLine("[VNPay RETURN] signData: " + signData);
-            Console.WriteLine("[VNPay RETURN] computed: " + computed);
-            Console.WriteLine("[VNPay RETURN] fromVNPay: " + secureHashFromVnp);
+
+            // Log để so sánh nhanh khi cần
+            Console.WriteLine("[VNPay RETURN] signData=" + signData);
+            Console.WriteLine("[VNPay RETURN] computed=" + computed);
+            Console.WriteLine("[VNPay RETURN] fromVNPay=" + secureHashFromVnp);
 
             return computed.Equals(secureHashFromVnp, StringComparison.InvariantCultureIgnoreCase);
         }
@@ -89,26 +90,26 @@ namespace Services.Implementations
 
         private static string BuildSignedQuery(IDictionary<string, string> rawParams, string secret)
         {
-            // Sắp xếp theo key tăng dần & loại bỏ giá trị rỗng
             var sorted = new SortedDictionary<string, string>(
                 rawParams.Where(kv => !string.IsNullOrEmpty(kv.Value))
                          .ToDictionary(kv => kv.Key, kv => kv.Value),
                 StringComparer.Ordinal);
 
-            // Ký trên chuỗi đã UrlEncode (application/x-www-form-urlencoded: space -> '+')
-            var signData = BuildDataToSign(sorted);
+            var signData = BuildDataToSign(sorted);          // encode + hex thường
             var secureHash = ComputeHmacSha512(secret, signData);
-            Console.WriteLine("[VNPay SEND] signData: " + signData);
-            Console.WriteLine("[VNPay SEND] secureHash: " + secureHash);
-            // Build query gửi đi (encode giống hệt)
+
+            Console.WriteLine("[VNPay SEND] signData=" + signData);
+            Console.WriteLine("[VNPay SEND] secureHash=" + secureHash);
+
             var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={HttpUtility.UrlEncode(kv.Value, Encoding.UTF8)}");
+                $"{kv.Key}={UrlEncodeVnPay(kv.Value)}");
 
             var query = string.Join("&", encodedPairs);
             query += $"&vnp_SecureHash={secureHash}";
             return query;
         }
 
+        /// Build chuỗi ký: key=UrlEncode(value)&... (bỏ vnp_SecureHash/Type)
         private static string BuildDataToSign(IDictionary<string, string> parameters)
         {
             var sorted = new SortedDictionary<string, string>(
@@ -118,9 +119,33 @@ namespace Services.Implementations
                 StringComparer.Ordinal);
 
             var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={HttpUtility.UrlEncode(kv.Value, Encoding.UTF8)}"); // quan trọng: space -> '+'
+                $"{kv.Key}={UrlEncodeVnPay(kv.Value)}");
 
             return string.Join("&", encodedPairs);
+        }
+
+        // Encode theo application/x-www-form-urlencoded (space -> '+')
+        // và ép hex về chữ thường: %C3%A1 -> %c3%a1 (khớp sandbox VNPay)
+        private static string UrlEncodeVnPay(string value)
+        {
+            var encoded = HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8); // space -> '+', hex HOA
+            var sb = new StringBuilder(encoded.Length);
+            for (int i = 0; i < encoded.Length; i++)
+            {
+                char c = encoded[i];
+                if (c == '%' && i + 2 < encoded.Length)
+                {
+                    sb.Append('%');
+                    sb.Append(char.ToLowerInvariant(encoded[i + 1]));
+                    sb.Append(char.ToLowerInvariant(encoded[i + 2]));
+                    i += 2;
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
         }
 
         private static string ComputeHmacSha512(string key, string data)
