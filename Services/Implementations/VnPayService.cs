@@ -38,30 +38,45 @@ namespace Services.Implementations
             var returnUrl = _config["VnPay:ReturnUrl"];
 
             var vnp_Params = new SortedDictionary<string, string>
-            {
-                { "vnp_Version", "2.1.0" },
-                { "vnp_Command", "pay" },
-                { "vnp_TmnCode", tmnCode },
-                { "vnp_Amount", ((int)(order.TotalPrice.Value * 100)).ToString() }, // ✅ nhân 100
-                { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
-                { "vnp_CurrCode", "VND" },
-                { "vnp_IpAddr", ipAddress },
-                { "vnp_Locale", "vn" },
-                { "vnp_OrderInfo", $"Thanh toán đơn hàng #{order.OrderId}" },
-                { "vnp_OrderType", "other" },
-                { "vnp_ReturnUrl", returnUrl },
-                { "vnp_TxnRef", txnRef }
-            };
+    {
+        { "vnp_Version", "2.1.0" },
+        { "vnp_Command", "pay" },
+        { "vnp_TmnCode", tmnCode },
+        { "vnp_Amount", ((int)(order.TotalPrice.Value * 100)).ToString() },
+        { "vnp_CreateDate", DateTime.Now.ToString("yyyyMMddHHmmss") },
+        { "vnp_CurrCode", "VND" },
+        { "vnp_IpAddr", ipAddress },
+        { "vnp_Locale", "vn" },
+        { "vnp_OrderInfo", $"Thanh toán đơn hàng #{order.OrderId}" },
+        { "vnp_OrderType", "other" },
+        { "vnp_ReturnUrl", returnUrl },
+        { "vnp_TxnRef", txnRef }
+    };
 
+            // B1: Tạo rawData để ký (không encode)
             var signData = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={kv.Value}"));
-            var hash = ComputeHash(secretKey + signData);
 
-            vnp_Params.Add("vnp_SecureHashType", "SHA256");
+            // B2: Tạo hash
+            var hash = ComputeHmacSha512(secretKey, signData);
+
+            // B3: Thêm SecureHash
+            vnp_Params.Add("vnp_SecureHashType", "HMACSHA512");
             vnp_Params.Add("vnp_SecureHash", hash);
 
+            // B4: Tạo URL encode
             var finalQuery = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
             return $"{baseUrl}?{finalQuery}";
         }
+
+        private string ComputeHmacSha512(string key, string data)
+        {
+            using (var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key)))
+            {
+                var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+                return BitConverter.ToString(hashValue).Replace("-", "").ToUpper();
+            }
+        }
+
 
         public bool ValidateResponse(IQueryCollection vnpParams, out string txnRef)
         {
