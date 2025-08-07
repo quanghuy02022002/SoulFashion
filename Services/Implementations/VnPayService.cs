@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Web;
 
 namespace Services.Implementations
 {
@@ -33,7 +34,7 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
-            // Luôn dùng giờ VN (UTC+7) để tránh lệch
+            // Dùng giờ Việt Nam (UTC+7)
             var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
@@ -42,7 +43,7 @@ namespace Services.Implementations
                 ["vnp_Version"] = "2.1.0",
                 ["vnp_Command"] = "pay",
                 ["vnp_TmnCode"] = tmnCode,
-                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(),
+                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(), // VND x100
                 ["vnp_CreateDate"] = now.ToString("yyyyMMddHHmmss"),
                 ["vnp_ExpireDate"] = expire.ToString("yyyyMMddHHmmss"),
                 ["vnp_CurrCode"] = "VND",
@@ -52,7 +53,8 @@ namespace Services.Implementations
                 ["vnp_OrderType"] = "other",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
-                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm nhưng KHÔNG ký
+                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG đưa vào chuỗi ký
+                // ["vnp_BankCode"]   = "VNPAYQR" // tuỳ chọn
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -69,7 +71,7 @@ namespace Services.Implementations
             var secret = _config["VnPay:HashSecret"];
             var secureHashFromVnp = vnpParams["vnp_SecureHash"].ToString();
 
-            // Lấy tất cả param trừ hash & type, encode RFC3986 rồi ký lại
+            // Lấy tất cả param (trừ hash & type), encode y như lúc gửi rồi ký lại
             var data = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
@@ -84,16 +86,20 @@ namespace Services.Implementations
 
         private static string BuildSignedQuery(IDictionary<string, string> rawParams, string secret)
         {
+            // Sắp xếp theo key tăng dần & loại bỏ giá trị rỗng
             var sorted = new SortedDictionary<string, string>(
                 rawParams.Where(kv => !string.IsNullOrEmpty(kv.Value))
                          .ToDictionary(kv => kv.Key, kv => kv.Value),
                 StringComparer.Ordinal);
 
+            // Ký trên chuỗi đã UrlEncode (application/x-www-form-urlencoded: space -> '+')
             var signData = BuildDataToSign(sorted);
             var secureHash = ComputeHmacSha512(secret, signData);
-
+            Console.WriteLine("[VNPay SEND] signData: " + signData);
+            Console.WriteLine("[VNPay SEND] secureHash: " + secureHash);
+            // Build query gửi đi (encode giống hệt)
             var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={UrlEncodeRfc3986(kv.Value)}");
+                $"{kv.Key}={HttpUtility.UrlEncode(kv.Value, Encoding.UTF8)}");
 
             var query = string.Join("&", encodedPairs);
             query += $"&vnp_SecureHash={secureHash}";
@@ -109,15 +115,9 @@ namespace Services.Implementations
                 StringComparer.Ordinal);
 
             var encodedPairs = sorted.Select(kv =>
-                $"{kv.Key}={UrlEncodeRfc3986(kv.Value)}");
+                $"{kv.Key}={HttpUtility.UrlEncode(kv.Value, Encoding.UTF8)}"); // quan trọng: space -> '+'
 
             return string.Join("&", encodedPairs);
-        }
-
-        private static string UrlEncodeRfc3986(string value)
-        {
-            // RFC3986: space -> %20 (không phải '+'); giữ encode thống nhất 2 chiều
-            return Uri.EscapeDataString(value ?? string.Empty);
         }
 
         private static string ComputeHmacSha512(string key, string data)
