@@ -54,10 +54,14 @@ namespace Repositories.Implementations
             var tracked = await _context.Payments.FindAsync(payment.PaymentId);
             if (tracked != null)
             {
-                _context.Entry(tracked).CurrentValues.SetValues(payment);
+                tracked.PaymentStatus = payment.PaymentStatus;
+                tracked.PaidAt = payment.PaidAt;
+                tracked.UpdatedAt = payment.UpdatedAt;
+
                 await _context.SaveChangesAsync();
             }
         }
+
 
     }
 
