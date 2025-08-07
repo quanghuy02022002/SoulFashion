@@ -33,14 +33,13 @@ namespace Services.Implementations
                 throw new Exception("Không tìm thấy đơn hàng hoặc tổng giá chưa có.");
 
             var tmnCode = _config["VnPay:TmnCode"];
-            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();   // tránh ký tự thừa
+            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
             var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
-            // Tập tham số gốc (đừng thêm value rỗng)
             var p = new Dictionary<string, string?>
             {
                 ["vnp_Version"] = "2.1.0",
@@ -57,7 +56,7 @@ namespace Services.Implementations
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
                 ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
-                // ["vnp_BankCode"]  = dto.BankCode  // nếu có và không rỗng hãy thêm
+                // ["vnp_BankCode"]  = "VNPAYQR" // nếu cần, chỉ thêm khi có giá trị
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -68,15 +67,16 @@ namespace Services.Implementations
         {
             txnRef = vnpParams["vnp_TxnRef"];
 
-            if (!vnpParams.ContainsKey("vnp_SecureHash")) return false;
+            if (!vnpParams.ContainsKey("vnp_SecureHash"))
+                return false;
 
             var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
             var fromVnp = vnpParams["vnp_SecureHash"].ToString();
 
-            // Lọc đúng tập vnp_* và bỏ hash/type khỏi dữ liệu ký
+            // Lấy đúng tập vnp_* và bỏ hash/type + giá trị rỗng
             var data = vnpParams
                 .Where(kv => kv.Key.StartsWith("vnp_", StringComparison.Ordinal))
-                .Where(kv => kv.Key is not "vnp_SecureHash" && kv.Key is not "vnp_SecureHashType")
+                .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .Where(kv => !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
@@ -94,30 +94,35 @@ namespace Services.Implementations
 
         private string BuildSignedQuery(IDictionary<string, string?> rawParams, string secret)
         {
-            // Bỏ key rỗng/value rỗng
+            // Bỏ key/value rỗng
             var cleaned = rawParams
                 .Where(kv => !string.IsNullOrEmpty(kv.Key) && !string.IsNullOrEmpty(kv.Value))
                 .ToDictionary(kv => kv.Key!, kv => kv.Value!);
 
-            var signData = BuildDataToSign(cleaned);
-            var secureHash = ComputeHmacSha512(secret, signData);
+            // Ký trên form-encode chuẩn, KHÔNG gồm vnp_SecureHash / vnp_SecureHashType
+            var signData = BuildDataToSign(cleaned
+                .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+                .ToDictionary(kv => kv.Key, kv => kv.Value));
+
+            var secureHash = ComputeHmacSha512((_config["VnPay:HashSecret"] ?? string.Empty).Trim(), signData);
 
             _logger.LogInformation("[VNPay SEND] signData={signData}", signData);
             _logger.LogInformation("[VNPay SEND] secureHash={secureHash}", secureHash);
 
+            // Build query gửi đi (form-encode chuẩn)
             var sorted = new SortedDictionary<string, string>(cleaned, StringComparer.Ordinal);
             var query = string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
             return $"{query}&vnp_SecureHash={secureHash}";
         }
 
-        /// Tạo chuỗi ký: key=UrlEncode(value)&..., sắp xếp theo tên key (Ordinal)
+        /// Tạo chuỗi ký: key=UrlEncode(value)&... (sort Ordinal)
         private static string BuildDataToSign(IDictionary<string, string> parameters)
         {
             var sorted = new SortedDictionary<string, string>(parameters, StringComparer.Ordinal);
             return string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
         }
 
-        /// Encode theo application/x-www-form-urlencoded (space -> '+', HEX **chữ HOA**)
+        /// Form-encode chuẩn .NET: space -> '+', HEX CHỮ HOA (KHÔNG ép lowercase)
         private static string FormEncode(string value) =>
             HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
 
