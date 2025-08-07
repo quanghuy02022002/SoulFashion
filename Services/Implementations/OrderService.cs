@@ -43,7 +43,10 @@ namespace Services.Implementations
                 RentStart = order.RentStart,
                 RentEnd = order.RentEnd,
                 IsPaid = order.IsPaid ?? false,
-                CustomerId = order.CustomerId
+                CustomerId = order.CustomerId,
+                ShippingAddress = order.ShippingAddress,
+                RecipientName = order.RecipientName,
+                RecipientPhone = order.RecipientPhone,               
             });
         }
 
@@ -63,6 +66,9 @@ namespace Services.Implementations
                 RentEnd = dto.RentEnd,
                 IsPaid = dto.IsPaid,
                 Note = dto.Note,
+                RecipientName = dto.RecipientName,
+                RecipientPhone = dto.RecipientPhone,
+                ShippingAddress = dto.ShippingAddress,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -145,6 +151,9 @@ namespace Services.Implementations
             order.RentEnd = dto.RentEnd;
             order.IsPaid = dto.IsPaid;
             order.Note = dto.Note;
+            order.RecipientName = dto.RecipientName;
+            order.RecipientPhone = dto.RecipientPhone;
+            order.ShippingAddress = dto.ShippingAddress;
             order.UpdatedAt = DateTime.Now;
 
             await _orderRepository.UpdateAsync(order);
@@ -226,6 +235,9 @@ namespace Services.Implementations
                 TotalPrice = order.TotalPrice,
                 IsPaid = order.IsPaid ?? false,
                 Note = order.Note,
+                RecipientName = order.RecipientName,
+                RecipientPhone = order.RecipientPhone,
+                ShippingAddress = order.ShippingAddress,
                 Items = order.OrderItems.Select(x => new OrderItemDto
                 {
                     CostumeId = x.CostumeId,

@@ -15,6 +15,9 @@ namespace Repositories.DTOs
         public DateTime? RentEnd { get; set; }
         public bool IsPaid { get; set; }
         public int CustomerId { get; set; }
+        public string RecipientName { get; set; }
+        public string RecipientPhone { get; set; }
+        public string ShippingAddress { get; set; }
     }
 
 }

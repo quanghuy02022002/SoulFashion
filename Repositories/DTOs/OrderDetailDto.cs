@@ -13,7 +13,9 @@ namespace Repositories.DTOs
         public decimal? TotalPrice { get; set; }
         public bool IsPaid { get; set; }
         public string? Note { get; set; }
-
+        public string RecipientName { get; set; }
+        public string RecipientPhone { get; set; }
+        public string ShippingAddress { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
         public DepositDto? Deposit { get; set; }
         public ReturnInspectionDto? ReturnInfo { get; set; }

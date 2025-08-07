@@ -15,7 +15,9 @@ namespace Repositories.DTOs
         public bool IsPaid { get; set; } = false;
         public string? Note { get; set; }
         public string PaymentMethod { get; set; } = "cash";
-
+        public string RecipientName { get; set; }
+        public string RecipientPhone { get; set; }
+        public string ShippingAddress { get; set; }
         public List<OrderItemDto> Items { get; set; } = new(); // ✅ Bắt buộc
     }
 

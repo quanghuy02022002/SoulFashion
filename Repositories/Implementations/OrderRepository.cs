@@ -36,6 +36,9 @@ namespace Repositories.Implementations
                 .Include(o => o.StatusHistories)
                 .Include(o => o.ReturnInspection)
                 .Include(o => o.Payments)
+                .Include(o => o.ShippingAddress)
+                .Include(o => o.RecipientName)
+                .Include(o => o.RecipientPhone)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
         }
 
