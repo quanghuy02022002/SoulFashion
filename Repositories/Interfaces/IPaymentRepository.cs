@@ -1,8 +1,5 @@
 ﻿using Repositories.Models;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Repositories.Interfaces
@@ -12,12 +9,14 @@ namespace Repositories.Interfaces
         Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId);
         Task<Payment> CreateAsync(Payment payment);
         Task<Payment?> GetByTxnRefAsync(string txnRef);
-        Task DeleteAsync(int paymentId);
-        Task<Payment> GetByIdAsync(int paymentId);
+        Task<Payment?> GetByIdAsync(int paymentId);
         Task<Payment?> GetPaymentWithOrderAsync(string txnRef);
-        Task SaveChangesAsync();
-
+        Task DeleteAsync(int paymentId);
         Task UpdateAsync(Payment payment);
-    }
 
+        /// <summary>
+        /// Cập nhật Payment kèm Order + Deposit + StatusHistories trong 1 transaction
+        /// </summary>
+        Task UpdatePaymentWithOrderAsync(Payment payment);
+    }
 }

@@ -35,9 +35,19 @@ namespace Repositories.Implementations
                                  .FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
         }
 
-        public async Task<Payment> GetByIdAsync(int paymentId)
+        public async Task<Payment?> GetByIdAsync(int paymentId)
         {
             return await _context.Payments.FindAsync(paymentId);
+        }
+
+        public async Task<Payment?> GetPaymentWithOrderAsync(string txnRef)
+        {
+            return await _context.Payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.Deposit)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.StatusHistories)
+                .FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
         }
 
         public async Task DeleteAsync(int paymentId)
@@ -52,28 +62,36 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Payment payment)
         {
-            _context.Attach(payment);
-            _context.Entry(payment).Property(p => p.PaymentStatus).IsModified = true;
-            _context.Entry(payment).Property(p => p.PaidAt).IsModified = true;
-            _context.Entry(payment).Property(p => p.UpdatedAt).IsModified = true;
-            _context.Entry(payment).Property(p => p.PaymentMethod).IsModified = true;
-
-            await _context.SaveChangesAsync();
-        }
-        public async Task<Payment?> GetPaymentWithOrderAsync(string txnRef)
-        {
-            return await _context.Payments
-                .Include(p => p.Order)
-                    .ThenInclude(o => o.Deposit)
-                .Include(p => p.Order)
-                    .ThenInclude(o => o.StatusHistories)
-                .FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
-        }
-
-        public async Task SaveChangesAsync()
-        {
+            _context.Entry(payment).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Update Payment và Order liên quan trong 1 lần SaveChanges
+        /// </summary>
+        public async Task UpdatePaymentWithOrderAsync(Payment payment)
+        {
+            // Mark Payment as modified
+            _context.Entry(payment).State = EntityState.Modified;
+
+            if (payment.Order != null)
+            {
+                _context.Entry(payment.Order).State = EntityState.Modified;
+
+                if (payment.Order.Deposit != null)
+                    _context.Entry(payment.Order.Deposit).State = EntityState.Modified;
+
+                if (payment.Order.StatusHistories != null && payment.Order.StatusHistories.Any())
+                {
+                    foreach (var history in payment.Order.StatusHistories)
+                    {
+                        if (history.HistoryId == 0) // chỉ add nếu mới
+                            _context.OrderStatusHistories.Add(history);
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
     }
 }
