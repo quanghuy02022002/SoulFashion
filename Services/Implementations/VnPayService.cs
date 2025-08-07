@@ -34,6 +34,7 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
+            // Các tham số gửi sang VNPAY
             var vnp_Params = new SortedDictionary<string, string>
             {
                 { "vnp_Version", "2.1.0" },
@@ -50,49 +51,49 @@ namespace Services.Implementations
                 { "vnp_TxnRef", txnRef }
             };
 
-            // 1️⃣ Tạo raw data để ký (không encode)
+            // 1. Build chuỗi signData (không URL encode, đã sort sẵn do SortedDictionary)
             var signData = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={kv.Value}"));
 
-            // 2️⃣ Tạo hash HMACSHA512
+            // 2. Tạo chữ ký bằng HMACSHA512
             var secureHash = ComputeHmacSha512(secretKey, signData);
 
-            // 3️⃣ Thêm SecureHash vào param
+            // 3. Thêm SecureHash vào params
             vnp_Params.Add("vnp_SecureHashType", "HMACSHA512");
             vnp_Params.Add("vnp_SecureHash", secureHash);
 
-            // 4️⃣ Tạo URL encode để gửi đi
-            var finalQuery = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
-            return $"{baseUrl}?{finalQuery}";
+            // 4. Build query string (có URL encode khi tạo URL cuối)
+            var queryString = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
+
+            return $"{baseUrl}?{queryString}";
         }
 
         public bool ValidateResponse(IQueryCollection vnpParams, out string txnRef)
         {
             txnRef = vnpParams["vnp_TxnRef"];
 
-            if (!vnpParams.ContainsKey("vnp_SecureHash"))
-                return false;
+            if (!vnpParams.ContainsKey("vnp_SecureHash")) return false;
 
-            var secureHash = vnpParams["vnp_SecureHash"].ToString();
             var hashSecret = _config["VnPay:HashSecret"];
+            var vnp_SecureHash = vnpParams["vnp_SecureHash"].ToString();
 
+            // Lọc bỏ SecureHash & SecureHashType để ký lại
             var sortedParams = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .OrderBy(kv => kv.Key)
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
             var signData = string.Join("&", sortedParams.Select(kv => $"{kv.Key}={kv.Value}"));
+
             var computedHash = ComputeHmacSha512(hashSecret, signData);
 
-            return computedHash.Equals(secureHash, StringComparison.OrdinalIgnoreCase);
+            return computedHash.Equals(vnp_SecureHash, StringComparison.InvariantCultureIgnoreCase);
         }
 
         private string ComputeHmacSha512(string key, string data)
         {
-            using (var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key)))
-            {
-                var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-                return BitConverter.ToString(hashValue).Replace("-", "").ToUpper();
-            }
+            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key));
+            var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return BitConverter.ToString(hashValue).Replace("-", "").ToUpper();
         }
     }
 }
