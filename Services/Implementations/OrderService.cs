@@ -302,14 +302,14 @@ namespace Services.Implementations
 
         public async Task MarkOrderAsPaidAsync(int orderId, string paymentMethod)
         {
+            // Lấy đủ navigation
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null) throw new Exception("Order not found");
 
-            // Cập nhật trạng thái đơn hàng
+            // Cập nhật order
             order.Status = "confirmed";
             order.IsPaid = true;
 
-            // Cập nhật trạng thái đặt cọc nếu có
             if (order.Deposit != null)
             {
                 order.Deposit.DepositStatus = "paid";
@@ -317,7 +317,6 @@ namespace Services.Implementations
                 order.Deposit.UpdatedAt = DateTime.Now;
             }
 
-            // Ghi lịch sử trạng thái mới
             order.StatusHistories.Add(new OrderStatusHistory
             {
                 OrderId = order.OrderId,
@@ -330,6 +329,7 @@ namespace Services.Implementations
 
             await _orderRepository.UpdateAsync(order);
         }
+
 
     }
 }
