@@ -70,6 +70,7 @@ namespace Services.Implementations
                 payment.PaymentStatus = "paid";
                 payment.PaidAt = DateTime.Now;
                 payment.UpdatedAt = DateTime.Now;
+
                 await _repo.UpdateAsync(payment);
 
                 // 👉 Đồng thời cập nhật trạng thái đơn hàng
@@ -82,5 +83,6 @@ namespace Services.Implementations
                 }
             }
         }
+
     }
 }

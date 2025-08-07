@@ -51,16 +51,16 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Payment payment)
         {
-            var tracked = await _context.Payments.FindAsync(payment.PaymentId);
-            if (tracked != null)
-            {
-                tracked.PaymentStatus = payment.PaymentStatus;
-                tracked.PaidAt = payment.PaidAt;
-                tracked.UpdatedAt = payment.UpdatedAt;
+            _context.Payments.Attach(payment);
 
-                await _context.SaveChangesAsync();
-            }
+            _context.Entry(payment).Property(p => p.PaymentStatus).IsModified = true;
+            _context.Entry(payment).Property(p => p.PaidAt).IsModified = true;
+            _context.Entry(payment).Property(p => p.UpdatedAt).IsModified = true;
+            _context.Entry(payment).Property(p => p.PaymentMethod).IsModified = true; // Bổ sung nếu cần đổi phương thức
+
+            await _context.SaveChangesAsync();
         }
+
 
 
     }
