@@ -1,19 +1,17 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Repositories.DTOs;
+using Repositories.Interfaces;
+using Services.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
+using System.Web;
 
 namespace Services.Implementations
 {
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Extensions.Configuration;
-    using Repositories.DTOs;
-    using Repositories.Interfaces;
-    using Services.Interfaces;
-    using System.Security.Cryptography;
-    using System.Web;
-
     public class VnPayService : IVnPayService
     {
         private readonly IConfiguration _config;
@@ -36,7 +34,6 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
-            // Tạo dictionary tham số và sắp xếp theo key
             var vnp_Params = new SortedDictionary<string, string>
             {
                 { "vnp_Version", "2.1.0" },
@@ -53,28 +50,19 @@ namespace Services.Implementations
                 { "vnp_TxnRef", txnRef }
             };
 
-            // B1: Tạo chuỗi dữ liệu ký
+            // 1️⃣ Tạo raw data để ký (không encode)
             var signData = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={kv.Value}"));
 
-            // B2: Tạo chữ ký HMAC SHA512
-            var hash = ComputeHmacSha512(secretKey, signData);
+            // 2️⃣ Tạo hash HMACSHA512
+            var secureHash = ComputeHmacSha512(secretKey, signData);
 
-            // B3: Thêm SecureHash vào tham số
+            // 3️⃣ Thêm SecureHash vào param
             vnp_Params.Add("vnp_SecureHashType", "HMACSHA512");
-            vnp_Params.Add("vnp_SecureHash", hash);
+            vnp_Params.Add("vnp_SecureHash", secureHash);
 
-            // B4: Encode các giá trị khi tạo URL
+            // 4️⃣ Tạo URL encode để gửi đi
             var finalQuery = string.Join("&", vnp_Params.Select(kv => $"{kv.Key}={HttpUtility.UrlEncode(kv.Value)}"));
             return $"{baseUrl}?{finalQuery}";
-        }
-
-        private string ComputeHmacSha512(string key, string data)
-        {
-            using (var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key)))
-            {
-                var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-                return BitConverter.ToString(hashValue).Replace("-", "").ToUpper();
-            }
         }
 
         public bool ValidateResponse(IQueryCollection vnpParams, out string txnRef)
@@ -84,23 +72,27 @@ namespace Services.Implementations
             if (!vnpParams.ContainsKey("vnp_SecureHash"))
                 return false;
 
-            var hashSecret = _config["VnPay:HashSecret"];
             var secureHash = vnpParams["vnp_SecureHash"].ToString();
+            var hashSecret = _config["VnPay:HashSecret"];
 
-            // Lấy toàn bộ tham số trừ SecureHash và SecureHashType, sắp xếp theo key
             var sortedParams = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .OrderBy(kv => kv.Key)
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
 
-            // Tạo chuỗi ký
-            string signData = string.Join("&", sortedParams.Select(kv => $"{kv.Key}={kv.Value}"));
+            var signData = string.Join("&", sortedParams.Select(kv => $"{kv.Key}={kv.Value}"));
+            var computedHash = ComputeHmacSha512(hashSecret, signData);
 
-            // Tính hash
-            string computedHash = ComputeHmacSha512(hashSecret, signData);
+            return computedHash.Equals(secureHash, StringComparison.OrdinalIgnoreCase);
+        }
 
-            // So sánh chữ ký
-            return string.Equals(computedHash, secureHash, StringComparison.OrdinalIgnoreCase);
+        private string ComputeHmacSha512(string key, string data)
+        {
+            using (var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key)))
+            {
+                var hashValue = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+                return BitConverter.ToString(hashValue).Replace("-", "").ToUpper();
+            }
         }
     }
 }
