@@ -81,6 +81,22 @@ namespace Services.Implementations
 
             return dto;
         }
+        public async Task<bool> UpdateIsMainAsync(int imageId, bool isMain)
+        {
+            var image = await _repository.GetByIdAsync(imageId);
+            if (image == null) return false;
+
+            if (isMain)
+            {
+                await _repository.UnsetMainImageAsync(image.CostumeId);
+            }
+
+            image.IsMain = isMain;
+            image.UpdatedAt = DateTime.Now;
+
+            await _repository.UpdateAsync(image);
+            return true;
+        }
 
         public async Task<bool> DeleteAsync(int id)
         {

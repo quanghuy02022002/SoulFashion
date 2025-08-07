@@ -71,6 +71,13 @@ public class CostumeImageController : ControllerBase
         return Ok(updated);
     }
 
+    [HttpPut("{id}/is-main")]
+    public async Task<IActionResult> UpdateIsMain(int id, [FromBody] bool isMain)
+    {
+        var success = await _service.UpdateIsMainAsync(id, isMain);
+        if (!success) return NotFound();
+        return NoContent();
+    }
 
 
     [HttpDelete("{id}")]

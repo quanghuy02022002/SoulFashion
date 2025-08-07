@@ -13,6 +13,7 @@ namespace Services.Interfaces
         Task<CostumeImageDTO?> GetByIdAsync(int id);
         Task<CostumeImageDTO> AddAsync(CostumeImageDTO dto);
         Task<CostumeImageDTO?> UpdateAsync(int id, CostumeImageDTO dto);
+        Task<bool> UpdateIsMainAsync(int imageId, bool isMain);
 
         Task<bool> DeleteAsync(int id);
     }
