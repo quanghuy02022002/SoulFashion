@@ -78,6 +78,9 @@ namespace Services.Implementations
 
             var signData = BuildDataToSign(data);
             var computed = ComputeHmacSha512(secret, signData);
+            Console.WriteLine("[VNPay RETURN] signData: " + signData);
+            Console.WriteLine("[VNPay RETURN] computed: " + computed);
+            Console.WriteLine("[VNPay RETURN] fromVNPay: " + secureHashFromVnp);
 
             return computed.Equals(secureHashFromVnp, StringComparison.InvariantCultureIgnoreCase);
         }
