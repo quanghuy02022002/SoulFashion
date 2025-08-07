@@ -45,7 +45,7 @@ namespace Services.Implementations
                 ["vnp_Version"] = "2.1.0",
                 ["vnp_Command"] = "pay",
                 ["vnp_TmnCode"] = tmnCode,
-                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(),
+                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(), // VND x100
                 ["vnp_CreateDate"] = now.ToString("yyyyMMddHHmmss"),
                 ["vnp_ExpireDate"] = expire.ToString("yyyyMMddHHmmss"),
                 ["vnp_CurrCode"] = "VND",
@@ -56,7 +56,7 @@ namespace Services.Implementations
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
                 ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
-                // ["vnp_BankCode"]  = "VNPAYQR" // nếu cần, chỉ thêm khi có giá trị
+                // ["vnp_BankCode"]  = "VNPAYQR" // nếu cần thì thêm khi có giá trị
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -73,7 +73,7 @@ namespace Services.Implementations
             var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
             var fromVnp = vnpParams["vnp_SecureHash"].ToString();
 
-            // Lấy đúng tập vnp_* và bỏ hash/type + giá trị rỗng
+            // Lấy đúng tập vnp_*, bỏ rỗng, bỏ vnp_SecureHash/Type khỏi chuỗi ký
             var data = vnpParams
                 .Where(kv => kv.Key.StartsWith("vnp_", StringComparison.Ordinal))
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
@@ -100,16 +100,16 @@ namespace Services.Implementations
                 .ToDictionary(kv => kv.Key!, kv => kv.Value!);
 
             // Ký trên form-encode chuẩn, KHÔNG gồm vnp_SecureHash / vnp_SecureHashType
-            var signData = BuildDataToSign(cleaned
-                .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                .ToDictionary(kv => kv.Key, kv => kv.Value));
+            var signData = BuildDataToSign(
+                cleaned.Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+                       .ToDictionary(kv => kv.Key, kv => kv.Value));
 
             var secureHash = ComputeHmacSha512((_config["VnPay:HashSecret"] ?? string.Empty).Trim(), signData);
 
             _logger.LogInformation("[VNPay SEND] signData={signData}", signData);
             _logger.LogInformation("[VNPay SEND] secureHash={secureHash}", secureHash);
 
-            // Build query gửi đi (form-encode chuẩn)
+            // Build query gửi đi (form-encode chuẩn: space -> '+', HEX CHỮ HOA)
             var sorted = new SortedDictionary<string, string>(cleaned, StringComparer.Ordinal);
             var query = string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
             return $"{query}&vnp_SecureHash={secureHash}";
