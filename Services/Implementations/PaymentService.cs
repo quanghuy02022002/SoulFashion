@@ -4,7 +4,6 @@ using Repositories.Models;
 using Services.Interfaces;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Services.Implementations
@@ -14,6 +13,7 @@ namespace Services.Implementations
         private readonly IPaymentRepository _repo;
         private readonly IOrderRepository _orderRepo;
         private readonly IOrderService _orderService;
+
         public PaymentService(IPaymentRepository repo, IOrderRepository orderRepo, IOrderService orderService)
         {
             _repo = repo;
@@ -26,7 +26,7 @@ namespace Services.Implementations
 
         public async Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef)
         {
-            // 🔍 Lấy tổng tiền từ đơn hàng
+            // Lấy tổng tiền từ đơn hàng
             var order = await _orderRepo.GetByIdAsync(dto.OrderId);
             if (order == null)
                 throw new Exception("Order not found");
@@ -67,19 +67,24 @@ namespace Services.Implementations
 
         public async Task MarkAsPaid(string txnRef)
         {
+            if (string.IsNullOrWhiteSpace(txnRef))
+                throw new ArgumentException("Transaction reference cannot be empty");
+
             var payment = await _repo.GetByTxnRefAsync(txnRef);
-            if (payment != null && payment.PaymentStatus != "paid")
-            {
-                // 1️⃣ Cập nhật Payment
-                payment.PaymentStatus = "paid";
-                payment.PaidAt = DateTime.Now;
-                payment.UpdatedAt = DateTime.Now;
-                await _repo.UpdateAsync(payment);
+            if (payment == null)
+                throw new Exception($"Payment not found for transactionRef: {txnRef}");
 
-                // 2️⃣ Gọi OrderService để cập nhật Order
-                await _orderService.MarkOrderAsPaidAsync(payment.OrderId, payment.PaymentMethod);
-            }
+            if (payment.PaymentStatus == "paid")
+                return; // Đã thanh toán rồi thì bỏ qua
+
+            // 1️⃣ Cập nhật Payment
+            payment.PaymentStatus = "paid";
+            payment.PaidAt = DateTime.Now;
+            payment.UpdatedAt = DateTime.Now;
+            await _repo.UpdateAsync(payment);
+
+            // 2️⃣ Gọi OrderService để cập nhật Order đầy đủ
+            await _orderService.MarkOrderAsPaidAsync(payment.OrderId, payment.PaymentMethod ?? "unknown");
         }
-
     }
 }

@@ -4,7 +4,6 @@ using Repositories.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Repositories.Implementations
@@ -19,7 +18,9 @@ namespace Repositories.Implementations
         }
 
         public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId) =>
-            await _context.Payments.Where(p => p.OrderId == orderId).ToListAsync();
+            await _context.Payments
+                          .Where(p => p.OrderId == orderId)
+                          .ToListAsync();
 
         public async Task<Payment> CreateAsync(Payment payment)
         {
@@ -30,10 +31,10 @@ namespace Repositories.Implementations
 
         public async Task<Payment?> GetByTxnRefAsync(string txnRef)
         {
-            return await _context.Payments.FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
+            return await _context.Payments
+                                 .FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
         }
 
-   
         public async Task<Payment> GetByIdAsync(int paymentId)
         {
             return await _context.Payments.FindAsync(paymentId);
@@ -51,18 +52,23 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Payment payment)
         {
-            _context.Payments.Attach(payment);
+            // Nếu entity chưa được tracking, attach vào context
+            var isTracked = _context.ChangeTracker
+                                    .Entries<Payment>()
+                                    .Any(e => e.Entity.PaymentId == payment.PaymentId);
 
+            if (!isTracked)
+            {
+                _context.Payments.Attach(payment);
+            }
+
+            // Đánh dấu các field cần cập nhật
             _context.Entry(payment).Property(p => p.PaymentStatus).IsModified = true;
             _context.Entry(payment).Property(p => p.PaidAt).IsModified = true;
             _context.Entry(payment).Property(p => p.UpdatedAt).IsModified = true;
-            _context.Entry(payment).Property(p => p.PaymentMethod).IsModified = true; // Bổ sung nếu cần đổi phương thức
+            _context.Entry(payment).Property(p => p.PaymentMethod).IsModified = true;
 
             await _context.SaveChangesAsync();
         }
-
-
-
     }
-
 }
