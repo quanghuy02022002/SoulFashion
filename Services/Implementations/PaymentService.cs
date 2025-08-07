@@ -69,47 +69,49 @@ namespace Services.Implementations
             if (string.IsNullOrWhiteSpace(txnRef))
                 throw new ArgumentException("Transaction reference cannot be empty");
 
-            var payment = await _repo.GetByTxnRefAsync(txnRef);
+            // Lấy payment kèm order & deposit trong 1 context
+            var payment = await _repo.GetPaymentWithOrderAsync(txnRef);
             if (payment == null)
                 throw new Exception($"Payment not found for transactionRef: {txnRef}");
 
             if (payment.PaymentStatus == "paid")
                 return; // Đã thanh toán rồi thì bỏ qua
 
-            // 🔹 Cập nhật Payment
+            // --- Update Payment ---
             payment.PaymentStatus = "paid";
             payment.PaidAt = DateTime.Now;
             payment.UpdatedAt = DateTime.Now;
 
-            // 🔹 Lấy Order kèm Deposit
-            var order = await _orderRepo.GetByIdAsync(payment.OrderId);
-            if (order == null)
-                throw new Exception($"Order not found for payment: {payment.PaymentId}");
-
-            order.Status = "confirmed";
-            order.IsPaid = true;
-            order.UpdatedAt = DateTime.Now;
-
-            if (order.Deposit != null)
+            // --- Update Order ---
+            var order = payment.Order;
+            if (order != null)
             {
-                order.Deposit.DepositStatus = "paid";
-                order.Deposit.PaymentMethod = payment.PaymentMethod ?? order.Deposit.PaymentMethod;
-                order.Deposit.UpdatedAt = DateTime.Now;
+                order.Status = "confirmed";
+                order.IsPaid = true;
+                order.UpdatedAt = DateTime.Now;
+
+                // Update Deposit nếu có
+                if (order.Deposit != null)
+                {
+                    order.Deposit.DepositStatus = "paid";
+                    order.Deposit.PaymentMethod = payment.PaymentMethod ?? order.Deposit.PaymentMethod;
+                    order.Deposit.UpdatedAt = DateTime.Now;
+                }
+
+                // Ghi thêm lịch sử trạng thái
+                order.StatusHistories.Add(new OrderStatusHistory
+                {
+                    OrderId = order.OrderId,
+                    Status = "confirmed",
+                    Note = "Thanh toán thành công qua " + (payment.PaymentMethod ?? "unknown"),
+                    ChangedAt = DateTime.Now
+                });
             }
 
-            // 🔹 Thêm status history
-            order.StatusHistories.Add(new OrderStatusHistory
-            {
-                OrderId = order.OrderId,
-                Status = "confirmed",
-                Note = "Thanh toán thành công qua " + (payment.PaymentMethod ?? "unknown"),
-                ChangedAt = DateTime.Now
-            });
-
-            // 🔹 Lưu tất cả thay đổi
-            await _repo.UpdateAsync(payment);
-            await _orderRepo.UpdateAsync(order);
+            // Lưu tất cả trong 1 transaction
+            await _repo.SaveChangesAsync();
         }
+
 
     }
 }

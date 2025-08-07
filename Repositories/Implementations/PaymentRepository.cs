@@ -60,6 +60,20 @@ namespace Repositories.Implementations
 
             await _context.SaveChangesAsync();
         }
+        public async Task<Payment?> GetPaymentWithOrderAsync(string txnRef)
+        {
+            return await _context.Payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.Deposit)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.StatusHistories)
+                .FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
+        }
 
     }
 }
