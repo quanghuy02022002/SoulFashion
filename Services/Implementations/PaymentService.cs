@@ -5,7 +5,6 @@ using Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Services.Implementations
@@ -14,11 +13,12 @@ namespace Services.Implementations
     {
         private readonly IPaymentRepository _repo;
         private readonly IOrderRepository _orderRepo;
-
-        public PaymentService(IPaymentRepository repo, IOrderRepository orderRepo)
+        private readonly IOrderService _orderService;
+        public PaymentService(IPaymentRepository repo, IOrderRepository orderRepo, IOrderService orderService)
         {
             _repo = repo;
             _orderRepo = orderRepo;
+            _orderService = orderService;
         }
 
         public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId) =>
@@ -26,16 +26,17 @@ namespace Services.Implementations
 
         public async Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef)
         {
-            // 🔍 Tự động lấy tổng tiền từ đơn hàng
+            // 🔍 Lấy tổng tiền từ đơn hàng
             var order = await _orderRepo.GetByIdAsync(dto.OrderId);
-            if (order == null) throw new Exception("Order not found");
+            if (order == null)
+                throw new Exception("Order not found");
 
             var payment = new Payment
             {
                 OrderId = dto.OrderId,
                 Amount = order.TotalPrice ?? throw new Exception("Order.TotalPrice is null"),
-                PaymentMethod = dto.PaymentMethod.ToLower(),
-                PaymentStatus = dto.PaymentStatus.ToLower(),
+                PaymentMethod = dto.PaymentMethod?.ToLower(),
+                PaymentStatus = dto.PaymentStatus?.ToLower(),
                 TransactionCode = txnRef,
                 PaidAt = dto.PaidAt,
                 CreatedAt = DateTime.Now,
@@ -44,6 +45,7 @@ namespace Services.Implementations
 
             return await _repo.CreateAsync(payment);
         }
+
         public async Task DeleteAsync(int paymentId)
         {
             await _repo.DeleteAsync(paymentId);
@@ -52,7 +54,8 @@ namespace Services.Implementations
         public async Task UpdateAsync(PaymentDto dto)
         {
             var payment = await _repo.GetByIdAsync(dto.PaymentId);
-            if (payment == null) throw new Exception("Payment not found");
+            if (payment == null)
+                throw new Exception("Payment not found");
 
             payment.PaymentMethod = dto.PaymentMethod;
             payment.PaymentStatus = dto.PaymentStatus;
@@ -67,20 +70,14 @@ namespace Services.Implementations
             var payment = await _repo.GetByTxnRefAsync(txnRef);
             if (payment != null && payment.PaymentStatus != "paid")
             {
+                // 1️⃣ Cập nhật Payment
                 payment.PaymentStatus = "paid";
                 payment.PaidAt = DateTime.Now;
                 payment.UpdatedAt = DateTime.Now;
-
                 await _repo.UpdateAsync(payment);
 
-                // 👉 Đồng thời cập nhật trạng thái đơn hàng
-                var order = await _orderRepo.GetByIdAsync(payment.OrderId);
-                if (order != null && order.Status == "pending")
-                {
-                    order.Status = "confirmed";
-                    order.UpdatedAt = DateTime.Now;
-                    await _orderRepo.UpdateAsync(order);
-                }
+                // 2️⃣ Gọi OrderService để cập nhật Order
+                await _orderService.MarkOrderAsPaidAsync(payment.OrderId, payment.PaymentMethod);
             }
         }
 
