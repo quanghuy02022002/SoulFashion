@@ -35,7 +35,7 @@ namespace Services.Implementations
             var returnUrl = _config["VnPay:ReturnUrl"];
 
             // Thời gian hiện tại & hết hạn (khuyến nghị: +15 phút)
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
             // Tham số theo spec VNPAY
