@@ -8,9 +8,21 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Repositories.Models;
+using Microsoft.Extensions.Logging.AzureAppServices;
 
 var builder = WebApplication.CreateBuilder(args);
+// Bật provider cho App Service Log Stream
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();                 // optional, hữu ích local
+builder.Logging.AddAzureWebAppDiagnostics();  // quan trọng cho Log Stream
 
+// (tuỳ chọn) cấu hình giới hạn file/size:
+builder.Services.Configure<AzureFileLoggerOptions>(o =>
+{
+    o.FileName = "app-logs-";
+    o.FileSizeLimit = 10 * 1024 * 1024; // 10 MB
+    o.RetainedFileCountLimit = 5;
+});
 // Add services to the container.
 
 builder.Services.AddControllers();
