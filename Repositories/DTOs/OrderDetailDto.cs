@@ -16,6 +16,7 @@ namespace Repositories.DTOs
         public string RecipientName { get; set; }
         public string RecipientPhone { get; set; }
         public string ShippingAddress { get; set; }
+        public bool? HasIdentityCard { get; set; } // 👈 THÊM DÒNG NÀY
         public List<OrderItemDto> Items { get; set; } = new();
         public DepositDto? Deposit { get; set; }
         public ReturnInspectionDto? ReturnInfo { get; set; }

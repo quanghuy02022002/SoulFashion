@@ -46,7 +46,7 @@ namespace Services.Implementations
                 CustomerId = order.CustomerId,
                 ShippingAddress = order.ShippingAddress,
                 RecipientName = order.RecipientName,
-                RecipientPhone = order.RecipientPhone,               
+                RecipientPhone = order.RecipientPhone,    
             });
         }
 
@@ -74,29 +74,49 @@ namespace Services.Implementations
             };
 
             var items = new List<OrderItem>();
+            decimal totalRental = 0;
+            decimal depositAmount = 0;
+
             foreach (var itemDto in dto.Items)
             {
                 var costume = await _costumeRepository.GetByIdAsync(itemDto.CostumeId);
                 if (costume == null) throw new Exception("Costume không tồn tại");
 
-                var price = itemDto.IsRental ? costume.PriceRent : costume.PriceSale;
-                if (price == null) throw new Exception("Không có giá phù hợp cho costume này");
+                var priceRent = costume.PriceRent ?? throw new Exception("Costume chưa có giá thuê");
+
+                decimal itemTotal = priceRent * itemDto.Quantity;
+                totalRental += itemTotal;
+
+                // Dùng giá thuê làm giá cọc
+                depositAmount += itemTotal;
 
                 items.Add(new OrderItem
                 {
                     CostumeId = itemDto.CostumeId,
                     Quantity = itemDto.Quantity,
-                    Price = price.Value,
+                    Price = priceRent,
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
                 });
             }
 
+            // Điều chỉnh cọc theo căn cước
+            if (dto.HasIdentityCard == true)
+            {
+                depositAmount /= 2;
+            }
+            else
+            {
+                depositAmount *= 3;
+            }
+
+            // Gán danh sách items và tính tổng tiền (thuê + cọc)
             order.OrderItems = items;
-            order.TotalPrice = items.Sum(x => x.Quantity * x.Price);
+            order.TotalPrice = totalRental + depositAmount;
 
             var createdOrder = await _orderRepository.CreateAsync(order);
 
+            // Ghi lịch sử trạng thái
             await _statusHistoryRepository.CreateAsync(new OrderStatusHistory
             {
                 OrderId = createdOrder.OrderId,
@@ -105,36 +125,11 @@ namespace Services.Implementations
                 Note = "Order created"
             });
 
-            // ✅ Tính tiền cọc theo HasIdentityCard
-            decimal totalDeposit = 0;
-            int totalQuantity = 0;
-
-            foreach (var item in items)
-            {
-                var costume = await _costumeRepository.GetByIdAsync(item.CostumeId);
-                if (costume == null) throw new Exception("Costume không tồn tại khi tính cọc");
-
-                var priceSale = costume.PriceSale ?? throw new Exception("Không có giá bán");
-
-                totalDeposit += priceSale * item.Quantity;
-                totalQuantity += item.Quantity;
-            }
-
-            // Điều chỉnh theo căn cước
-            if (dto.HasIdentityCard == true)
-            {
-                totalDeposit /= 2;
-            }
-            else if (dto.HasIdentityCard == false)
-            {
-                totalDeposit *= 3;
-            }
-
-           
+            // Tạo thông tin cọc
             await _depositRepository.CreateAsync(new Deposit
             {
                 OrderId = createdOrder.OrderId,
-                DepositAmount = decimal.Round(totalDeposit, 0),
+                DepositAmount = decimal.Round(depositAmount, 0),
                 DepositStatus = "pending",
                 PaymentMethod = dto.PaymentMethod ?? "cash",
                 CreatedAt = DateTime.Now,
@@ -143,6 +138,7 @@ namespace Services.Implementations
 
             return createdOrder;
         }
+
 
         public async Task UpdateOrderAsync(int id, OrderDto dto)
         {
@@ -244,11 +240,12 @@ namespace Services.Implementations
                 RecipientName = order.RecipientName,
                 RecipientPhone = order.RecipientPhone,
                 ShippingAddress = order.ShippingAddress,
+                HasIdentityCard = order.HasIdentityCard, // ✅ Bổ sung ở đây
                 Items = order.OrderItems.Select(x => new OrderItemDto
                 {
                     CostumeId = x.CostumeId,
                     Quantity = x.Quantity,
-                    IsRental = order.RentStart != null // tạm dựa vào logic ngày thuê
+                    IsRental = order.RentStart != null
                 }).ToList(),
                 Deposit = order.Deposit != null ? new DepositDto
                 {
@@ -271,6 +268,7 @@ namespace Services.Implementations
                     Note = h.Note
                 }).ToList() ?? new List<OrderStatusHistoryDto>()
             };
+
 
             return dto;
         }

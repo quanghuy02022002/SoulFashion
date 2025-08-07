@@ -24,6 +24,8 @@ public partial class Order
     public string RecipientName { get; set; }
     public string RecipientPhone { get; set; }
     public string ShippingAddress { get; set; }
+    public bool? HasIdentityCard { get; set; } // ✅ Thêm dòng này
+
     public Deposit? Deposit { get; set; }
     public ICollection<OrderStatusHistory>? StatusHistories { get; set; }
     public ReturnInspection? ReturnInspection { get; set; }
