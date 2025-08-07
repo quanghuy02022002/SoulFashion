@@ -9,7 +9,6 @@ namespace SoulFashion.Controllers
     [ApiController]
     [Route("api/payments")]
     public class PaymentsController : ControllerBase
-
     {
         private readonly IPaymentService _paymentService;
         private readonly IVnPayService _vnPayService;
@@ -32,20 +31,29 @@ namespace SoulFashion.Controllers
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
             var txnRef = "TXN" + dto.OrderId + DateTime.Now.Ticks;
 
-            // Lưu payment pending
+            // Chỉ lưu dto.OrderId + method, không dùng amount
             await _paymentService.CreatePaymentAsync(dto, txnRef);
-
             var url = _vnPayService.CreatePaymentUrl(dto, ip, txnRef);
+
             return Ok(new { paymentUrl = url });
+        }
+
+        [HttpPost("momo")]
+        public async Task<IActionResult> CreateMomoLink([FromBody] PaymentDto dto)
+        {
+            var txnRef = "MOMO" + dto.OrderId + DateTime.Now.Ticks;
+
+            await _paymentService.CreatePaymentAsync(dto, txnRef);
+            var payUrl = await _momoService.CreatePaymentAsync(dto, txnRef);
+
+            return Ok(new { paymentUrl = payUrl });
         }
 
         [HttpPost("vnpay-callback-test")]
         public async Task<IActionResult> TestCallback([FromBody] string txnRef)
         {
             if (string.IsNullOrWhiteSpace(txnRef))
-            {
                 return BadRequest(new { success = false, message = "Thiếu transactionRef" });
-            }
 
             await _paymentService.MarkAsPaid(txnRef);
 
@@ -56,23 +64,10 @@ namespace SoulFashion.Controllers
                 transactionRef = txnRef
             });
         }
-        [HttpPost("momo")]
-        public async Task<IActionResult> CreateMomoLink([FromBody] PaymentDto dto)
-        {
-            var txnRef = "MOMO" + dto.OrderId + DateTime.Now.Ticks;
 
-            // Tạo payment pending trước
-            await _paymentService.CreatePaymentAsync(dto, txnRef);
-
-            // Gọi Momo để lấy link thanh toán
-            var payUrl = await _momoService.CreatePaymentAsync(dto, txnRef);
-
-            return Ok(new { paymentUrl = payUrl });
-        }
         [HttpPost("momo-notify")]
         public async Task<IActionResult> MomoNotify([FromBody] JsonElement body)
         {
-            // Log toàn bộ request (ví dụ in ra console — có thể thay bằng lưu DB/file/log service)
             Console.WriteLine("== Momo Notify Callback ==");
             Console.WriteLine(body.ToString());
 
@@ -80,15 +75,10 @@ namespace SoulFashion.Controllers
             {
                 var orderId = body.GetProperty("orderId").GetString();
                 var resultCode = body.GetProperty("resultCode").GetInt32();
-                var amount = body.TryGetProperty("amount", out var amtJson) ? amtJson.GetString() : "unknown";
-
-                Console.WriteLine($"Momo gửi orderId = {orderId}, resultCode = {resultCode}, amount = {amount}");
 
                 if (resultCode == 0 && !string.IsNullOrEmpty(orderId))
                 {
                     await _paymentService.MarkAsPaid(orderId);
-                    Console.WriteLine("✅ Thanh toán được xác nhận từ Momo");
-
                     return Ok(new
                     {
                         message = "OK",
@@ -97,12 +87,10 @@ namespace SoulFashion.Controllers
                     });
                 }
 
-                Console.WriteLine("❌ Momo báo giao dịch thất bại hoặc thiếu mã đơn hàng");
                 return BadRequest(new { message = "FAILED", status = "error" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Lỗi xử lý notify: {ex.Message}");
                 return StatusCode(500, new { message = "Notify error", error = ex.Message });
             }
         }
@@ -126,7 +114,5 @@ namespace SoulFashion.Controllers
                 message = "Thanh toán thất bại hoặc bị hủy"
             });
         }
-
     }
-
 }
