@@ -6,6 +6,7 @@ using System.Text;
 using System.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Repositories.DTOs;
 using Repositories.Interfaces;
 using Services.Interfaces;
@@ -16,11 +17,13 @@ namespace Services.Implementations
     {
         private readonly IConfiguration _config;
         private readonly IOrderRepository _orderRepo;
+        private readonly ILogger<VnPayService> _logger;
 
-        public VnPayService(IConfiguration config, IOrderRepository orderRepo)
+        public VnPayService(IConfiguration config, IOrderRepository orderRepo, ILogger<VnPayService> logger)
         {
             _config = config;
             _orderRepo = orderRepo;
+            _logger = logger;
         }
 
         public string CreatePaymentUrl(PaymentDto dto, string ipAddress, string txnRef)
@@ -34,7 +37,6 @@ namespace Services.Implementations
             var baseUrl = _config["VnPay:BaseUrl"];
             var returnUrl = _config["VnPay:ReturnUrl"];
 
-            // Giờ VN (UTC+7) + hết hạn 15'
             var now = DateTime.UtcNow.AddHours(7);
             var expire = now.AddMinutes(15);
 
@@ -53,7 +55,7 @@ namespace Services.Implementations
                 ["vnp_OrderType"] = "other",
                 ["vnp_ReturnUrl"] = returnUrl,
                 ["vnp_TxnRef"] = txnRef,
-                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
+                ["vnp_SecureHashType"] = "HMACSHA512"
             };
 
             var signedQuery = BuildSignedQuery(p, secret);
@@ -70,7 +72,6 @@ namespace Services.Implementations
             var secret = _config["VnPay:HashSecret"];
             var secureHashFromVnp = vnpParams["vnp_SecureHash"].ToString();
 
-            // Build lại signData y hệt cách gửi đi (encode + hex thường)
             var data = vnpParams
                 .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
                 .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
@@ -78,28 +79,25 @@ namespace Services.Implementations
             var signData = BuildDataToSign(data);
             var computed = ComputeHmacSha512(secret, signData);
 
-            // Log để so sánh nhanh khi cần
-            Console.WriteLine("[VNPay RETURN] signData=" + signData);
-            Console.WriteLine("[VNPay RETURN] computed=" + computed);
-            Console.WriteLine("[VNPay RETURN] fromVNPay=" + secureHashFromVnp);
+            _logger.LogInformation("[VNPay RETURN] signData={signData}", signData);
+            _logger.LogInformation("[VNPay RETURN] computed={computed}", computed);
+            _logger.LogInformation("[VNPay RETURN] fromVNPay={fromVNPay}", secureHashFromVnp);
 
             return computed.Equals(secureHashFromVnp, StringComparison.InvariantCultureIgnoreCase);
         }
 
-        // ===================== Helpers =====================
-
-        private static string BuildSignedQuery(IDictionary<string, string> rawParams, string secret)
+        private string BuildSignedQuery(IDictionary<string, string> rawParams, string secret)
         {
             var sorted = new SortedDictionary<string, string>(
                 rawParams.Where(kv => !string.IsNullOrEmpty(kv.Value))
                          .ToDictionary(kv => kv.Key, kv => kv.Value),
                 StringComparer.Ordinal);
 
-            var signData = BuildDataToSign(sorted);          // encode + hex thường
+            var signData = BuildDataToSign(sorted);
             var secureHash = ComputeHmacSha512(secret, signData);
 
-            Console.WriteLine("[VNPay SEND] signData=" + signData);
-            Console.WriteLine("[VNPay SEND] secureHash=" + secureHash);
+            _logger.LogInformation("[VNPay SEND] signData={signData}", signData);
+            _logger.LogInformation("[VNPay SEND] secureHash={secureHash}", secureHash);
 
             var encodedPairs = sorted.Select(kv =>
                 $"{kv.Key}={UrlEncodeVnPay(kv.Value)}");
@@ -109,7 +107,6 @@ namespace Services.Implementations
             return query;
         }
 
-        /// Build chuỗi ký: key=UrlEncode(value)&... (bỏ vnp_SecureHash/Type)
         private static string BuildDataToSign(IDictionary<string, string> parameters)
         {
             var sorted = new SortedDictionary<string, string>(
@@ -124,11 +121,9 @@ namespace Services.Implementations
             return string.Join("&", encodedPairs);
         }
 
-        // Encode theo application/x-www-form-urlencoded (space -> '+')
-        // và ép hex về chữ thường: %C3%A1 -> %c3%a1 (khớp sandbox VNPay)
         private static string UrlEncodeVnPay(string value)
         {
-            var encoded = HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8); // space -> '+', hex HOA
+            var encoded = HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
             var sb = new StringBuilder(encoded.Length);
             for (int i = 0; i < encoded.Length; i++)
             {
