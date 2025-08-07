@@ -44,6 +44,23 @@ namespace Services.Implementations
 
             return await _repo.CreateAsync(payment);
         }
+        public async Task DeleteAsync(int paymentId)
+        {
+            await _repo.DeleteAsync(paymentId);
+        }
+
+        public async Task UpdateAsync(PaymentDto dto)
+        {
+            var payment = await _repo.GetByIdAsync(dto.PaymentId);
+            if (payment == null) throw new Exception("Payment not found");
+
+            payment.PaymentMethod = dto.PaymentMethod;
+            payment.PaymentStatus = dto.PaymentStatus;
+            payment.PaidAt = dto.PaidAt;
+            payment.UpdatedAt = DateTime.Now;
+
+            await _repo.UpdateAsync(payment);
+        }
 
         public async Task MarkAsPaid(string txnRef)
         {
