@@ -12,6 +12,10 @@ namespace Repositories.Interfaces
         Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId);
         Task<Payment> CreateAsync(Payment payment);
         Task<Payment?> GetByTxnRefAsync(string txnRef);
+        Task DeleteAsync(int paymentId);
+        Task<Payment> GetByIdAsync(int paymentId);
+        Task UpdateAsync(Payment payment);
+
         Task UpdateAsync(Payment payment);
     }
 

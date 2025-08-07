@@ -12,6 +12,8 @@ namespace Services.Interfaces
     {
         Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId);
         Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef);
+        Task DeleteAsync(int paymentId);
+        Task UpdateAsync(PaymentDto dto);
         Task MarkAsPaid(string txnRef);
     }
 

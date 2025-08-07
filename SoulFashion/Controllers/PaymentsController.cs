@@ -114,5 +114,19 @@ namespace SoulFashion.Controllers
                 message = "Thanh toán thất bại hoặc bị hủy"
             });
         }
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _paymentService.DeleteAsync(id);
+            return NoContent();
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> Update([FromBody] PaymentDto dto)
+        {
+            await _paymentService.UpdateAsync(dto);
+            return Ok(new { message = "Cập nhật thành công" });
+        }
+
     }
 }

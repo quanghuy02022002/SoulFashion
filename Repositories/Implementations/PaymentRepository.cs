@@ -33,11 +33,32 @@ namespace Repositories.Implementations
             return await _context.Payments.FirstOrDefaultAsync(p => p.TransactionCode == txnRef);
         }
 
+   
+        public async Task<Payment> GetByIdAsync(int paymentId)
+        {
+            return await _context.Payments.FindAsync(paymentId);
+        }
+
+        public async Task DeleteAsync(int paymentId)
+        {
+            var payment = await _context.Payments.FindAsync(paymentId);
+            if (payment != null)
+            {
+                _context.Payments.Remove(payment);
+                await _context.SaveChangesAsync();
+            }
+        }
+
         public async Task UpdateAsync(Payment payment)
         {
-            _context.Payments.Update(payment);
-            await _context.SaveChangesAsync();
+            var tracked = await _context.Payments.FindAsync(payment.PaymentId);
+            if (tracked != null)
+            {
+                _context.Entry(tracked).CurrentValues.SetValues(payment);
+                await _context.SaveChangesAsync();
+            }
         }
+
     }
 
 }
