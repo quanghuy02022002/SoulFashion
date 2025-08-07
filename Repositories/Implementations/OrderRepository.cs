@@ -48,22 +48,9 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Order order)
         {
-            _context.Attach(order);
-            _context.Entry(order).Property(o => o.Status).IsModified = true;
-            _context.Entry(order).Property(o => o.IsPaid).IsModified = true;
-            _context.Entry(order).Property(o => o.UpdatedAt).IsModified = true;
-
-            if (order.Deposit != null)
-            {
-                _context.Attach(order.Deposit);
-                _context.Entry(order.Deposit).Property(d => d.DepositStatus).IsModified = true;
-                _context.Entry(order.Deposit).Property(d => d.PaymentMethod).IsModified = true;
-                _context.Entry(order.Deposit).Property(d => d.UpdatedAt).IsModified = true;
-            }
-
+            _context.Orders.Update(order);
             await _context.SaveChangesAsync();
         }
-
 
         public async Task DeleteAsync(int orderId)
         {

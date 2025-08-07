@@ -300,35 +300,6 @@ namespace Services.Implementations
             await _depositRepository.UpdateAsync(deposit);
         }
 
-        public async Task MarkOrderAsPaidAsync(int orderId, string paymentMethod)
-        {
-            var order = new Order
-            {
-                OrderId = orderId,
-                Status = "confirmed",
-                IsPaid = true,
-                UpdatedAt = DateTime.Now,
-                Deposit = new Deposit
-                {
-                    OrderId = orderId,
-                    DepositStatus = "paid",
-                    PaymentMethod = paymentMethod,
-                    UpdatedAt = DateTime.Now
-                }
-            };
-
-            await _orderRepository.UpdateAsync(order);
-
-            await _statusHistoryRepository.CreateAsync(new OrderStatusHistory
-            {
-                OrderId = orderId,
-                Status = "confirmed",
-                Note = "Thanh toán thành công qua " + paymentMethod,
-                ChangedAt = DateTime.Now
-            });
-        }
-
-
 
     }
 }
