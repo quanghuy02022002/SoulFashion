@@ -48,9 +48,30 @@ namespace Repositories.Implementations
 
         public async Task UpdateAsync(Order order)
         {
+            // Update order chính
             _context.Orders.Update(order);
+
+            // Đảm bảo navigation Deposit được update
+            if (order.Deposit != null)
+            {
+                _context.Entry(order.Deposit).State = EntityState.Modified;
+            }
+
+            // Đảm bảo thêm mới status histories nếu có
+            if (order.StatusHistories != null)
+            {
+                foreach (var history in order.StatusHistories)
+                {
+                    if (history.HistoryId == 0) // mới thêm
+                    {
+                        _context.OrderStatusHistories.Add(history);
+                    }
+                }
+            }
+
             await _context.SaveChangesAsync();
         }
+
 
         public async Task DeleteAsync(int orderId)
         {
