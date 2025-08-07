@@ -52,15 +52,48 @@ namespace Repositories.Implementations
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task DeleteAsync(int orderId)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order != null)
-            {
-                _context.Orders.Remove(order);
-                await _context.SaveChangesAsync();
-            }
+            var order = await _context.Orders
+                .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.CollaboratorEarnings) // Nếu có navigation
+                .Include(o => o.Deposit)
+                .Include(o => o.StatusHistories)
+                .Include(o => o.ReturnInspection)
+                .Include(o => o.Payments)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+            if (order == null)
+                throw new Exception("Order not found");
+
+            // Xóa earnings trước (nếu không có navigation thì phải gọi thủ công)
+            var earningIds = order.OrderItems.Select(i => i.OrderItemId).ToList();
+            var earnings = _context.CollaboratorEarnings
+                .Where(e => earningIds.Contains(e.OrderItemId));
+            _context.CollaboratorEarnings.RemoveRange(earnings);
+
+            // Xóa các phần liên quan
+            if (order.Deposit != null)
+                _context.Deposits.Remove(order.Deposit);
+
+            if (order.StatusHistories != null && order.StatusHistories.Any())
+                _context.OrderStatusHistories.RemoveRange(order.StatusHistories);
+
+            if (order.ReturnInspection != null)
+                _context.ReturnInspections.Remove(order.ReturnInspection);
+
+            if (order.Payments != null && order.Payments.Any())
+                _context.Payments.RemoveRange(order.Payments);
+
+            if (order.OrderItems != null && order.OrderItems.Any())
+                _context.OrderItems.RemoveRange(order.OrderItems);
+
+            // Xóa Order
+            _context.Orders.Remove(order);
+
+            await _context.SaveChangesAsync();
         }
+
     }
 
 
