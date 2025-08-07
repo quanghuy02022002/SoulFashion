@@ -105,7 +105,7 @@ namespace Services.Implementations
                 Note = "Order created"
             });
 
-            // ✅ Chỉ tính tiền cọc theo yêu cầu
+            // ✅ Tính tiền cọc theo HasIdentityCard
             decimal totalDeposit = 0;
             int totalQuantity = 0;
 
@@ -120,11 +120,17 @@ namespace Services.Implementations
                 totalQuantity += item.Quantity;
             }
 
-            if (totalQuantity > 10)
+            // Điều chỉnh theo căn cước
+            if (dto.HasIdentityCard == true)
             {
                 totalDeposit /= 2;
             }
+            else if (dto.HasIdentityCard == false)
+            {
+                totalDeposit *= 3;
+            }
 
+           
             await _depositRepository.CreateAsync(new Deposit
             {
                 OrderId = createdOrder.OrderId,

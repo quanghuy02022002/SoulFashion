@@ -18,6 +18,8 @@ namespace Repositories.DTOs
         public string RecipientName { get; set; }
         public string RecipientPhone { get; set; }
         public string ShippingAddress { get; set; }
+        public bool? HasIdentityCard { get; set; }
+
         public List<OrderItemDto> Items { get; set; } = new(); // ✅ Bắt buộc
     }
 
