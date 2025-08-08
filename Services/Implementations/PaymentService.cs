@@ -1,4 +1,5 @@
 ﻿using Repositories.DTOs;
+using Repositories.Implementations;
 using Repositories.Interfaces;
 using Repositories.Models;
 using Services.Interfaces;
@@ -12,15 +13,26 @@ namespace Services.Implementations
     public class PaymentService : IPaymentService
     {
         private readonly IPaymentRepository _repo;
-        private readonly IOrderRepository _orderRepo;
+        private readonly IOrderRepository _orderRepo; // nếu cần
+        private readonly IEarningService _earningService;       // ✅ thêm
+        private readonly ICollaboratorEearningRepository _earningRepo; // ✅ thêm
+        private readonly AppDBContext _db;                       // ✅ thêm
 
-        public PaymentService(IPaymentRepository repo, IOrderRepository orderRepo)
+        public PaymentService(
+            IPaymentRepository repo,
+            IOrderRepository orderRepo,
+            IEarningService earningService,
+            ICollaboratorEearningRepository earningRepo,
+            AppDBContext db)
         {
             _repo = repo;
             _orderRepo = orderRepo;
+            _earningService = earningService;
+            _earningRepo = earningRepo;
+            _db = db;
         }
-
-        public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId) =>
+    
+    public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId) =>
             await _repo.GetByOrderIdAsync(orderId);
 
         public async Task<Payment> CreatePaymentAsync(PaymentDto dto, string txnRef)
@@ -111,6 +123,23 @@ namespace Services.Implementations
 
             // Lưu tất cả trong 1 transaction
             await _repo.UpdatePaymentWithOrderAsync(payment);
+            // 4) Rebuild earnings 30/70 (idempotent)
+            var orderId = payment.Order!.OrderId;
+            await _earningService.RebuildEarningsForOrderAsync(orderId);
+            using var tx = await _db.Database.BeginTransactionAsync();
+
+            // 5) Đánh dấu toàn bộ earnings của order là paid
+            var earnings = await _earningRepo.GetByOrderIdAsync(orderId);
+            var now = DateTime.Now;
+            foreach (var e in earnings)
+            {
+                e.Status = "paid";
+                e.PaidAt = e.PaidAt ?? now;
+                e.UpdatedAt = now;
+            }
+            await _db.SaveChangesAsync();
+
+            await tx.CommitAsync();
         }
 
     }
