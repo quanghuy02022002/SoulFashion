@@ -84,26 +84,27 @@ namespace Services.Implementations
             if (string.IsNullOrWhiteSpace(txnRef))
                 throw new ArgumentException("Transaction reference cannot be empty");
 
-            var payment = await _repo.GetPaymentWithOrderAsync(txnRef);
-            if (payment == null)
-                throw new Exception($"Payment not found for transactionRef: {txnRef}");
+            var payment = await _repo.GetPaymentWithOrderAsync(txnRef)
+                          ?? throw new Exception($"Payment not found for transactionRef: {txnRef}");
 
-            if (payment.PaymentStatus == "paid")
+            if (string.Equals(payment.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
                 return; // đã thanh toán thì bỏ qua
 
-            // Cập nhật Payment
+            // 🔒 BẮT ĐẦU TRANSACTION TỪ ĐẦU
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
+            // 1) Cập nhật Payment
             payment.PaymentStatus = "paid";
             payment.PaidAt = DateTime.Now;
             payment.UpdatedAt = DateTime.Now;
 
-            // Cập nhật Order
+            // 2) Cập nhật Order + Deposit + History
             if (payment.Order != null)
             {
                 payment.Order.Status = "confirmed";
                 payment.Order.IsPaid = true;
                 payment.Order.UpdatedAt = DateTime.Now;
 
-                // Cập nhật Deposit
                 if (payment.Order.Deposit != null)
                 {
                     payment.Order.Deposit.DepositStatus = "paid";
@@ -111,7 +112,8 @@ namespace Services.Implementations
                     payment.Order.Deposit.UpdatedAt = DateTime.Now;
                 }
 
-                // Thêm status history
+                // đảm bảo list không null
+                payment.Order.StatusHistories ??= new List<OrderStatusHistory>();
                 payment.Order.StatusHistories.Add(new OrderStatusHistory
                 {
                     OrderId = payment.Order.OrderId,
@@ -121,24 +123,38 @@ namespace Services.Implementations
                 });
             }
 
-            // Lưu tất cả trong 1 transaction
+            // 3) Lưu Payment + Order
             await _repo.UpdatePaymentWithOrderAsync(payment);
+
             // 4) Rebuild earnings 30/70 (idempotent)
             var orderId = payment.Order!.OrderId;
             await _earningService.RebuildEarningsForOrderAsync(orderId);
-            using var tx = await _db.Database.BeginTransactionAsync();
 
-            // 5) Đánh dấu toàn bộ earnings của order là paid
-            var earnings = await _earningRepo.GetByOrderIdAsync(orderId);
+            // 5) Đổi status & paidAt cho earnings của order
             var now = DateTime.Now;
+            var earnings = await _earningRepo.GetByOrderIdAsync(orderId);
+
+            // --- A) Set PAID cho TẤT CẢ earnings (admin + collaborator) ---
             foreach (var e in earnings)
             {
                 e.Status = "paid";
-                e.PaidAt = e.PaidAt ?? now;
-                e.UpdatedAt = now;
+                e.PaidAt ??=  DateTime.Now; // chỉ set PaidAt nếu chưa có
+                e.UpdatedAt = DateTime.Now;
             }
-            await _db.SaveChangesAsync();
 
+            // --- B) (Tuỳ chọn) Nếu CHỈ muốn set cho collaborator ---
+            // var adminId = await _db.Users
+            //     .Where(u => u.Role == "admin" && u.IsActive == true)
+            //     .Select(u => u.UserId)
+            //     .SingleAsync();
+            // foreach (var e in earnings.Where(x => x.UserId != adminId))
+            // {
+            //     e.Status = "paid";
+            //     e.PaidAt ??= now;
+            //     e.UpdatedAt = now;
+            // }
+
+            await _db.SaveChangesAsync();
             await tx.CommitAsync();
         }
 
