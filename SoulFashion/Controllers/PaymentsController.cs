@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Repositories.DTOs;
 using Services.Interfaces;
 using System.Text.Json;
@@ -14,7 +15,10 @@ namespace SoulFashion.Controllers
         private readonly IVnPayService _vnPayService;
         private readonly IMomoService _momoService;
 
-        public PaymentsController(IPaymentService paymentService, IVnPayService vnPayService, IMomoService momoService)
+        public PaymentsController(
+            IPaymentService paymentService,
+            IVnPayService vnPayService,
+            IMomoService momoService)
         {
             _paymentService = paymentService;
             _vnPayService = vnPayService;
@@ -29,25 +33,55 @@ namespace SoulFashion.Controllers
         public async Task<IActionResult> CreateVnPayLink([FromBody] PaymentDto dto)
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-            var txnRef = "TXN" + dto.OrderId + DateTime.Now.Ticks;
+            var txnRef = "TXN" + dto.OrderId + DateTime.UtcNow.Ticks;
 
-            // Chỉ lưu dto.OrderId + method, không dùng amount
             await _paymentService.CreatePaymentAsync(dto, txnRef);
             var url = _vnPayService.CreatePaymentUrl(dto, ip, txnRef);
-
             return Ok(new { paymentUrl = url });
         }
 
         [HttpPost("momo")]
         public async Task<IActionResult> CreateMomoLink([FromBody] PaymentDto dto)
         {
-            var txnRef = "MOMO" + dto.OrderId + DateTime.Now.Ticks;
-
+            var txnRef = "MOMO" + dto.OrderId + DateTime.UtcNow.Ticks;
             await _paymentService.CreatePaymentAsync(dto, txnRef);
             var payUrl = await _momoService.CreatePaymentAsync(dto, txnRef);
-
             return Ok(new { paymentUrl = payUrl });
         }
+
+        // ====== VNPay CALLBACK (GET) — VNPay redirect về bằng GET ======
+        [HttpGet("vnpay-callback")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VnPayCallback()
+        {
+            // Validate signature
+            var isValid = _vnPayService.ValidateResponse(Request.Query, out var txnRef);
+
+            var code = Request.Query["vnp_ResponseCode"].ToString();
+            var status = Request.Query["vnp_TransactionStatus"].ToString();
+
+            if (isValid && code == "00" && status == "00")
+            {
+                await _paymentService.MarkAsPaid(txnRef);
+                // Có thể Redirect về FE nếu muốn:
+                // return Redirect($"https://<your-fe>/payment/success?txnRef={txnRef}");
+                return Ok(new { success = true, message = "VNPay success", txnRef });
+            }
+
+            return BadRequest(new
+            {
+                success = false,
+                message = "VNPay failed or invalid signature",
+                txnRef,
+                code,
+                status
+            });
+        }
+
+        // (tuỳ VNPay/hoặc muốn bắt notify dạng POST)
+        [HttpPost("vnpay-callback")]
+        [AllowAnonymous]
+        public Task<IActionResult> VnPayCallbackPost() => VnPayCallback();
 
         [HttpPost("vnpay-callback-test")]
         public async Task<IActionResult> TestCallback([FromBody] string txnRef)
@@ -68,9 +102,6 @@ namespace SoulFashion.Controllers
         [HttpPost("momo-notify")]
         public async Task<IActionResult> MomoNotify([FromBody] JsonElement body)
         {
-            Console.WriteLine("== Momo Notify Callback ==");
-            Console.WriteLine(body.ToString());
-
             try
             {
                 var orderId = body.GetProperty("orderId").GetString();
@@ -79,12 +110,7 @@ namespace SoulFashion.Controllers
                 if (resultCode == 0 && !string.IsNullOrEmpty(orderId))
                 {
                     await _paymentService.MarkAsPaid(orderId);
-                    return Ok(new
-                    {
-                        message = "OK",
-                        status = "paid",
-                        transactionRef = orderId
-                    });
+                    return Ok(new { message = "OK", status = "paid", transactionRef = orderId });
                 }
 
                 return BadRequest(new { message = "FAILED", status = "error" });
@@ -99,21 +125,11 @@ namespace SoulFashion.Controllers
         public IActionResult MomoReturn([FromQuery] string orderId, [FromQuery] int resultCode)
         {
             if (resultCode == 0)
-            {
-                return Ok(new
-                {
-                    success = true,
-                    message = "Thanh toán thành công",
-                    transactionRef = orderId
-                });
-            }
+                return Ok(new { success = true, message = "Thanh toán thành công", transactionRef = orderId });
 
-            return BadRequest(new
-            {
-                success = false,
-                message = "Thanh toán thất bại hoặc bị hủy"
-            });
+            return BadRequest(new { success = false, message = "Thanh toán thất bại hoặc bị hủy" });
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -127,6 +143,5 @@ namespace SoulFashion.Controllers
             await _paymentService.UpdateAsync(dto);
             return Ok(new { message = "Cập nhật thành công" });
         }
-
     }
 }
