@@ -1,136 +1,177 @@
-﻿using System;
+﻿using bookify_data.Enums;
+using bookify_data.Helper;
+using bookify_data.Model;
+using bookify_service.Interfaces;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Services.Interfaces;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Web;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Repositories.DTOs;
-using Repositories.Interfaces;
-using Services.Interfaces;
 
-namespace Services.Implementations
+namespace bookify_service.Services
 {
-    public class VnPayService : IVnPayService
+    public class VnpayService : IVnpayService
     {
-        private readonly IConfiguration _config;
-        private readonly IOrderRepository _orderRepo;
-        private readonly ILogger<VnPayService> _logger;
+        private string _tmnCode;
+        private string _hashSecret;
+        private string _callbackUrl;
+        private string _baseUrl;
+        private string _version;
+        private string _orderType;
+        private readonly IOrderService _orderService;
+        private readonly ILogger<VnpayService> _logger;
 
-        public VnPayService(IConfiguration config, IOrderRepository orderRepo, ILogger<VnPayService> logger)
+        public VnpayService(IOrderService orderService, ILogger<VnpayService> logger)
         {
-            _config = config;
-            _orderRepo = orderRepo;
+            _orderService = orderService;
             _logger = logger;
         }
 
-        public string CreatePaymentUrl(PaymentDto dto, string ipAddress, string txnRef)
+        public void Initialize(string tmnCode, string hashSecret, string baseUrl, string callbackUrl,
+            string version = "2.1.0", string orderType = "other")
         {
-            var order = _orderRepo.GetByIdAsync(dto.OrderId).Result;
-            if (order is null || order.TotalPrice is null)
-                throw new Exception("Không tìm thấy đơn hàng hoặc tổng giá chưa có.");
-
-            var tmnCode = _config["VnPay:TmnCode"];
-            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
-            var baseUrl = _config["VnPay:BaseUrl"];
-            var returnUrl = _config["VnPay:ReturnUrl"];
-
-            var now = DateTime.UtcNow.AddHours(7);
-            var expire = now.AddMinutes(15);
-
-            var p = new Dictionary<string, string?>
-            {
-                ["vnp_Version"] = "2.1.0",
-                ["vnp_Command"] = "pay",
-                ["vnp_TmnCode"] = tmnCode,
-                ["vnp_Amount"] = ((long)(order.TotalPrice.Value * 100)).ToString(), // VND x100
-                ["vnp_CreateDate"] = now.ToString("yyyyMMddHHmmss"),
-                ["vnp_ExpireDate"] = expire.ToString("yyyyMMddHHmmss"),
-                ["vnp_CurrCode"] = "VND",
-                ["vnp_IpAddr"] = string.IsNullOrWhiteSpace(ipAddress) ? "127.0.0.1" : ipAddress,
-                ["vnp_Locale"] = "vn",
-                ["vnp_OrderInfo"] = $"Thanh toán đơn hàng #{order.OrderId}",
-                ["vnp_OrderType"] = "other",
-                ["vnp_ReturnUrl"] = returnUrl,
-                ["vnp_TxnRef"] = txnRef,
-                ["vnp_SecureHashType"] = "HMACSHA512" // gửi kèm, KHÔNG ký
-                // ["vnp_BankCode"]  = "VNPAYQR" // nếu cần thì thêm khi có giá trị
-            };
-
-            var signedQuery = BuildSignedQuery(p, secret);
-            return $"{baseUrl}?{signedQuery}";
+            _tmnCode = tmnCode;
+            _hashSecret = hashSecret;
+            _callbackUrl = callbackUrl;
+            _baseUrl = baseUrl;
+            _version = version;
+            _orderType = orderType;
+            EnsureParametersBeforePayment();
         }
 
-        public bool ValidateResponse(IQueryCollection vnpParams, out string txnRef)
+        private static string FormEncode(string value) =>
+            HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
+
+        private static string BuildDataToSign(IDictionary<string, string> parameters)
         {
-            txnRef = vnpParams["vnp_TxnRef"];
+            var sorted = new SortedDictionary<string, string>(
+                parameters
+                    .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+                    .Where(kv => !string.IsNullOrEmpty(kv.Value))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value),
+                StringComparer.Ordinal
+            );
 
-            if (!vnpParams.ContainsKey("vnp_SecureHash"))
-                return false;
-
-            var secret = (_config["VnPay:HashSecret"] ?? string.Empty).Trim();
-            var fromVnp = vnpParams["vnp_SecureHash"].ToString();
-
-            // Lấy đúng tập vnp_*, bỏ rỗng, bỏ vnp_SecureHash/Type khỏi chuỗi ký
-            var data = vnpParams
-                .Where(kv => kv.Key.StartsWith("vnp_", StringComparison.Ordinal))
-                .Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                .Where(kv => !string.IsNullOrEmpty(kv.Value))
-                .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
-
-            var signData = BuildDataToSign(data);
-            var computed = ComputeHmacSha512(secret, signData);
-
-            _logger.LogInformation("[VNPay RETURN] signData={signData}", signData);
-            _logger.LogInformation("[VNPay RETURN] computed={computed}", computed);
-            _logger.LogInformation("[VNPay RETURN] fromVNPay={fromVNPay}", fromVnp);
-
-            return computed.Equals(fromVnp, StringComparison.InvariantCultureIgnoreCase);
+            return string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
         }
 
-        // ================= Helpers =================
-
-        private string BuildSignedQuery(IDictionary<string, string?> rawParams, string secret)
+        private string BuildSignedQuery(IDictionary<string, string> rawParams)
         {
-            // Bỏ key/value rỗng
             var cleaned = rawParams
                 .Where(kv => !string.IsNullOrEmpty(kv.Key) && !string.IsNullOrEmpty(kv.Value))
-                .ToDictionary(kv => kv.Key!, kv => kv.Value!);
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
 
-            // Ký trên form-encode chuẩn, KHÔNG gồm vnp_SecureHash / vnp_SecureHashType
-            var signData = BuildDataToSign(
-                cleaned.Where(kv => kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
-                       .ToDictionary(kv => kv.Key, kv => kv.Value));
-
-            var secureHash = ComputeHmacSha512((_config["VnPay:HashSecret"] ?? string.Empty).Trim(), signData);
+            var signData = BuildDataToSign(cleaned);
+            var secureHash = ComputeHmacSha512(_hashSecret.Trim(), signData);
 
             _logger.LogInformation("[VNPay SEND] signData={signData}", signData);
             _logger.LogInformation("[VNPay SEND] secureHash={secureHash}", secureHash);
 
-            // Build query gửi đi (form-encode chuẩn: space -> '+', HEX CHỮ HOA)
             var sorted = new SortedDictionary<string, string>(cleaned, StringComparer.Ordinal);
             var query = string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
             return $"{query}&vnp_SecureHash={secureHash}";
         }
 
-        /// Tạo chuỗi ký: key=UrlEncode(value)&... (sort Ordinal)
-        private static string BuildDataToSign(IDictionary<string, string> parameters)
+        public string GetPaymentUrl(VnpayPaymentRequest request)
         {
-            var sorted = new SortedDictionary<string, string>(parameters, StringComparer.Ordinal);
-            return string.Join("&", sorted.Select(kv => $"{kv.Key}={FormEncode(kv.Value)}"));
+            EnsureParametersBeforePayment();
+
+            if (request.Money < 5000 || request.Money > 1000000000)
+                throw new ArgumentException("Số tiền thanh toán phải nằm trong khoảng 5.000 đến 1.000.000.000 VND.");
+            if (string.IsNullOrEmpty(request.Description))
+                throw new ArgumentException("Không được để trống mô tả giao dịch.");
+            if (string.IsNullOrEmpty(request.IpAddress))
+                throw new ArgumentException("Không được để trống địa chỉ IP.");
+
+            var data = new Dictionary<string, string>
+            {
+                { "vnp_Version", _version },
+                { "vnp_Command", "pay" },
+                { "vnp_TmnCode", _tmnCode },
+                { "vnp_Amount", (request.Money * 100).ToString() },
+                { "vnp_CreateDate", request.CreatedDate.ToString("yyyyMMddHHmmss") },
+                { "vnp_CurrCode", request.Currency.ToString().ToUpper() },
+                { "vnp_IpAddr", request.IpAddress },
+                { "vnp_Locale", EnumHelper.GetDescription(request.Language) },
+                { "vnp_BankCode", request.BankCode == BankCode.ANY ? string.Empty : request.BankCode.ToString() },
+                { "vnp_OrderInfo", request.Description.Trim() },
+                { "vnp_OrderType", _orderType },
+                { "vnp_ReturnUrl", _callbackUrl },
+                { "vnp_TxnRef", request.PaymentId.ToString() }
+            };
+
+            var signedQuery = BuildSignedQuery(data);
+            return $"{_baseUrl}?{signedQuery}";
         }
 
-        /// Form-encode chuẩn .NET: space -> '+', HEX CHỮ HOA (KHÔNG ép lowercase)
-        private static string FormEncode(string value) =>
-            HttpUtility.UrlEncode(value ?? string.Empty, Encoding.UTF8);
+        public VnpayPaymentResult GetPaymentResult(IQueryCollection parameters)
+        {
+            var responseData = parameters
+                .Where(kv => !string.IsNullOrEmpty(kv.Key) && kv.Key.StartsWith("vnp_"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+
+            var requiredKeys = new[] { "vnp_BankCode", "vnp_OrderInfo", "vnp_TransactionNo",
+                "vnp_ResponseCode", "vnp_TransactionStatus", "vnp_TxnRef", "vnp_SecureHash" };
+
+            if (requiredKeys.Any(k => string.IsNullOrEmpty(responseData.GetValueOrDefault(k))))
+                throw new ArgumentException("Không đủ dữ liệu để xác thực giao dịch");
+
+            var helper = new PaymentHelper();
+            foreach (var (key, value) in responseData)
+                if (!key.Equals("vnp_SecureHash"))
+                    helper.AddResponseData(key, value);
+
+            var responseCode = (ResponseCode)sbyte.Parse(responseData["vnp_ResponseCode"]);
+            var transactionStatusCode = (TransactionStatusCode)sbyte.Parse(responseData["vnp_TransactionStatus"]);
+
+            return new VnpayPaymentResult
+            {
+                PaymentId = long.Parse(responseData["vnp_TxnRef"]),
+                VnpayTransactionId = long.Parse(responseData["vnp_TransactionNo"]),
+                IsSuccess = transactionStatusCode == TransactionStatusCode.Code_00 &&
+                            responseCode == ResponseCode.Code_00 &&
+                            helper.IsSignatureCorrect(responseData["vnp_SecureHash"], _hashSecret),
+                Description = responseData["vnp_OrderInfo"],
+                PaymentMethod = string.IsNullOrEmpty(responseData.GetValueOrDefault("vnp_CardType"))
+                    ? "Không xác định" : responseData["vnp_CardType"],
+                Timestamp = string.IsNullOrEmpty(responseData.GetValueOrDefault("vnp_PayDate"))
+                    ? DateTime.Now
+                    : DateTime.ParseExact(responseData["vnp_PayDate"], "yyyyMMddHHmmss", CultureInfo.InvariantCulture),
+                TransactionStatus = new VnpayTransactionStatus
+                {
+                    Code = transactionStatusCode,
+                    Description = EnumHelper.GetDescription(transactionStatusCode)
+                },
+                PaymentResponse = new VnpayPaymentResponse
+                {
+                    Code = responseCode,
+                    Description = EnumHelper.GetDescription(responseCode)
+                },
+                BankingInfor = new VnpayBankingInfor
+                {
+                    BankCode = responseData["vnp_BankCode"],
+                    BankTransactionId = string.IsNullOrEmpty(responseData.GetValueOrDefault("vnp_BankTranNo"))
+                        ? "Không xác định" : responseData["vnp_BankTranNo"]
+                }
+            };
+        }
+
+        private void EnsureParametersBeforePayment()
+        {
+            if (string.IsNullOrEmpty(_baseUrl) || string.IsNullOrEmpty(_tmnCode) ||
+                string.IsNullOrEmpty(_hashSecret) || string.IsNullOrEmpty(_callbackUrl))
+                throw new ArgumentException("Không tìm thấy BaseUrl, TmnCode, HashSecret hoặc CallbackUrl");
+        }
 
         private static string ComputeHmacSha512(string key, string data)
         {
-            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(key ?? string.Empty));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data ?? string.Empty));
-            return BitConverter.ToString(hash).Replace("-", "").ToUpperInvariant();
+            using var hmac = new System.Security.Cryptography.HMACSHA512(Encoding.UTF8.GetBytes(key));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return BitConverter.ToString(hash).Replace("-", string.Empty);
         }
     }
 }
