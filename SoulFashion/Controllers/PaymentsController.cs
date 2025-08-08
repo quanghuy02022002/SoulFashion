@@ -54,7 +54,6 @@ namespace SoulFashion.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> VnPayCallback()
         {
-            // Validate signature
             var isValid = _vnPayService.ValidateResponse(Request.Query, out var txnRef);
 
             var code = Request.Query["vnp_ResponseCode"].ToString();
@@ -63,20 +62,15 @@ namespace SoulFashion.Controllers
             if (isValid && code == "00" && status == "00")
             {
                 await _paymentService.MarkAsPaid(txnRef);
-                // Có thể Redirect về FE nếu muốn:
-                // return Redirect($"https://<your-fe>/payment/success?txnRef={txnRef}");
-                return Ok(new { success = true, message = "VNPay success", txnRef });
+
+                // Redirect về FE khi thành công
+                return Redirect($"http://localhost:3000/payment-success?txnRef={txnRef}");
             }
 
-            return BadRequest(new
-            {
-                success = false,
-                message = "VNPay failed or invalid signature",
-                txnRef,
-                code,
-                status
-            });
+            // Redirect về FE khi thất bại
+            return Redirect("http://localhost:3000/payment-failed");
         }
+
 
         // (tuỳ VNPay/hoặc muốn bắt notify dạng POST)
         [HttpPost("vnpay-callback")]
