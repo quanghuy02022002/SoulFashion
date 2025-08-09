@@ -12,6 +12,7 @@ namespace Repositories.Interfaces
         Task<IEnumerable<Order>> GetAllAsync();
         Task<Order?> GetByIdAsync(int id);
         Task<Order> CreateAsync(Order order);
+        Task<IEnumerable<Order>> GetByUserIdAsync(int userId); // 🆕
         Task UpdateAsync(Order order);
         Task DeleteAsync(int id);
     }

@@ -79,7 +79,18 @@ namespace Repositories.Implementations
 
             await tx.CommitAsync();
         }
+        public async Task<IEnumerable<Order>> GetByUserIdAsync(int userId)
+        {
+            return await _context.Orders
+                .Where(o => o.CustomerId == userId)
+                .Include(o => o.OrderItems)
+                .Include(o => o.Deposit)
+                .Include(o => o.StatusHistories)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
     }
 
 
-    }
+}

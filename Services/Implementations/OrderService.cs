@@ -300,6 +300,24 @@ namespace Services.Implementations
             await _depositRepository.UpdateAsync(deposit);
         }
 
+        public async Task<IEnumerable<OrderSummaryDto>> GetOrdersByUserIdAsync(int userId)
+        {
+            var orders = await _orderRepository.GetByUserIdAsync(userId);
+
+            return orders.Select(order => new OrderSummaryDto
+            {
+                OrderId = order.OrderId,
+                Status = order.Status,
+                TotalPrice = order.TotalPrice,
+                RentStart = order.RentStart,
+                RentEnd = order.RentEnd,
+                IsPaid = order.IsPaid ?? false,
+                CustomerId = order.CustomerId,
+                ShippingAddress = order.ShippingAddress,
+                RecipientName = order.RecipientName,
+                RecipientPhone = order.RecipientPhone
+            });
+        }
 
     }
 }

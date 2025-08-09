@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Repositories.DTOs;
+using Services.Implementations;
 using Services.Interfaces;
 
 namespace SoulFashion.Controllers
@@ -42,6 +43,13 @@ namespace SoulFashion.Controllers
             {
                 return StatusCode(500, $"Lỗi khi lấy đơn hàng: {ex.Message}");
             }
+        }
+        // ✅ API lấy tất cả đơn hàng của một user
+        [HttpGet("user/{userId}")]
+        public async Task<IActionResult> GetOrdersByUserId(int userId)
+        {
+            var orders = await _service.GetOrdersByUserIdAsync(userId);
+            return Ok(orders);
         }
 
         [HttpPost]
