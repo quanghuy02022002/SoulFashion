@@ -6,10 +6,13 @@ using Services.Interfaces;
 public class CostumeService : ICostumeService
 {
     private readonly ICostumeRepository _repository;
+    private readonly IS3Service _s3Service; // ➕ thêm
 
-    public CostumeService(ICostumeRepository repository)
+    public CostumeService(ICostumeRepository repository, IS3Service s3Service)
     {
         _repository = repository;
+        _s3Service = s3Service;
+
     }
 
     public async Task<List<CostumeDTO>> GetAllAsync(string? search, int page, int pageSize)
@@ -153,9 +156,68 @@ public class CostumeService : ICostumeService
         }).ToList();
     }
 
-
     public async Task<bool> DeleteAsync(int id)
     {
+        var costume = await _repository.GetByIdAsync(id); // đã Include(CostumeImages)
+        if (costume == null) return false;
+
+        // Xóa file S3 trước (best-effort)
+        foreach (var img in costume.CostumeImages ?? Enumerable.Empty<CostumeImage>())
+        {
+            var key = TryExtractS3Key(img.ImageUrl);
+            if (!string.IsNullOrEmpty(key))
+            {
+                try
+                {
+                    await _s3Service.DeleteFileAsync(key);
+                }
+                catch
+                {
+                    // TODO: log lỗi nếu cần (không throw để không chặn việc xóa DB)
+                }
+            }
+        }
+
+        // Xóa DB (Costume + CostumeImages nhờ cascade)
         return await _repository.DeleteAsync(id);
     }
+
+    private static string? TryExtractS3Key(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl)) return null;
+
+        try
+        {
+            var uri = new Uri(imageUrl);
+
+            // Virtual-hosted-style: https://bucket.s3.region.amazonaws.com/folder/file.jpg
+            // -> key = uri.AbsolutePath.TrimStart('/')
+            // Path-style (cũ): https://s3.region.amazonaws.com/bucket/folder/file.jpg
+            // -> key = remove segment bucket ở đầu
+
+            var path = uri.AbsolutePath.TrimStart('/');
+            var host = uri.Host.ToLowerInvariant();
+
+            if (host.StartsWith("s3.") || host.StartsWith("s3-") || host.Equals("s3.amazonaws.com"))
+            {
+                // path-style => segment[0] là bucket
+                var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (segs.Length >= 2)
+                    return string.Join('/', segs.Skip(1));
+                return null;
+            }
+            else
+            {
+                // virtual-hosted-style => toàn bộ path là key
+                return path;
+            }
+        }
+        catch
+        {
+            // Fallback thô: lấy phần sau dấu '/' cuối cùng
+            var idx = imageUrl!.LastIndexOf('/');
+            return idx >= 0 && idx < imageUrl.Length - 1 ? imageUrl[(idx + 1)..] : imageUrl;
+        }
+    }
+
 }
