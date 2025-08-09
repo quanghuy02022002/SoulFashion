@@ -35,7 +35,7 @@ namespace Repositories.Implementations
                 .Include(o => o.Deposit)
                 .Include(o => o.StatusHistories)
                 .Include(o => o.ReturnInspection)
-                .Include(o => o.Payments)               
+                .Include(o => o.Payments)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
         }
 
@@ -54,47 +54,32 @@ namespace Repositories.Implementations
 
         public async Task DeleteAsync(int orderId)
         {
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                .ThenInclude(oi => oi.CollaboratorEarnings) // Nếu có navigation
-                .Include(o => o.Deposit)
-                .Include(o => o.StatusHistories)
-                .Include(o => o.ReturnInspection)
-                .Include(o => o.Payments)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+            await using var tx = await _context.Database.BeginTransactionAsync();
 
-            if (order == null)
-                throw new Exception("Order not found");
+            // Lấy danh sách OrderItemId của order
+            var itemIds = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId)
+                .Select(oi => oi.OrderItemId)
+                .ToListAsync();
 
-            // Xóa earnings trước (nếu không có navigation thì phải gọi thủ công)
-            var earningIds = order.OrderItems.Select(i => i.OrderItemId).ToList();
-            var earnings = _context.CollaboratorEarnings
-                .Where(e => earningIds.Contains(e.OrderItemId));
-            _context.CollaboratorEarnings.RemoveRange(earnings);
+            // 1) Xóa earnings theo itemIds
+            await _context.CollaboratorEarnings
+                .Where(e => itemIds.Contains(e.OrderItemId))
+                .ExecuteDeleteAsync();
 
-            // Xóa các phần liên quan
-            if (order.Deposit != null)
-                _context.Deposits.Remove(order.Deposit);
+            // 2) Xóa các bảng liên quan tới order
+            await _context.Deposits.Where(d => d.OrderId == orderId).ExecuteDeleteAsync();
+            await _context.OrderStatusHistories.Where(s => s.OrderId == orderId).ExecuteDeleteAsync();
+            await _context.ReturnInspections.Where(r => r.OrderId == orderId).ExecuteDeleteAsync();
+            await _context.Payments.Where(p => p.OrderId == orderId).ExecuteDeleteAsync();
+            await _context.OrderItems.Where(oi => oi.OrderId == orderId).ExecuteDeleteAsync();
 
-            if (order.StatusHistories != null && order.StatusHistories.Any())
-                _context.OrderStatusHistories.RemoveRange(order.StatusHistories);
+            // 3) Xóa chính Order
+            await _context.Orders.Where(o => o.OrderId == orderId).ExecuteDeleteAsync();
 
-            if (order.ReturnInspection != null)
-                _context.ReturnInspections.Remove(order.ReturnInspection);
-
-            if (order.Payments != null && order.Payments.Any())
-                _context.Payments.RemoveRange(order.Payments);
-
-            if (order.OrderItems != null && order.OrderItems.Any())
-                _context.OrderItems.RemoveRange(order.OrderItems);
-
-            // Xóa Order
-            _context.Orders.Remove(order);
-
-            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
         }
-
     }
 
 
-}
+    }
