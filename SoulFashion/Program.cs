@@ -116,6 +116,9 @@ builder.Services.AddScoped<ICollaboratorEearningRepository, CollaboratorEarningR
 builder.Services.AddScoped<ICollaboratorEarningCrudService, CollaboratorEarningCrudService>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IPayOsService, PayOsService>(); // ✅ đăng ký PayOS service
+builder.Services.AddHttpClient();                         // ✅ cho PayOsService gọi API
+
 // Cấu hình CORS: chỉ cho phép từ http://localhost:3000 (frontend React)
 builder.Services.AddCors(options =>
 {
