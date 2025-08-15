@@ -64,11 +64,11 @@ namespace SoulFashion.Controllers
                 await _paymentService.MarkAsPaid(txnRef);
 
                 // Redirect về FE khi thành công
-                return Redirect($"http://localhost:3000/payment-success?txnRef={txnRef}");
+                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?txnRef={txnRef}");
             }
 
             // Redirect về FE khi thất bại
-            return Redirect("http://localhost:3000/payment-failed");
+            return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
         }
 
 
