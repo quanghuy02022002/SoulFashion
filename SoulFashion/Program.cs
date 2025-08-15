@@ -114,7 +114,8 @@ builder.Services.AddScoped<IOrderStatusHistoryService, OrderStatusHistoryService
 builder.Services.AddScoped<IEarningService, EarningService>();
 builder.Services.AddScoped<ICollaboratorEearningRepository, CollaboratorEarningRepository>();
 builder.Services.AddScoped<ICollaboratorEarningCrudService, CollaboratorEarningCrudService>();
-
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 // Cấu hình CORS: chỉ cho phép từ http://localhost:3000 (frontend React)
 builder.Services.AddCors(options =>
 {
