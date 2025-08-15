@@ -55,7 +55,6 @@ namespace SoulFashion.Controllers
         public async Task<IActionResult> VnPayCallback()
         {
             var isValid = _vnPayService.ValidateResponse(Request.Query, out var txnRef);
-
             var code = Request.Query["vnp_ResponseCode"].ToString();
             var status = Request.Query["vnp_TransactionStatus"].ToString();
 
@@ -63,13 +62,13 @@ namespace SoulFashion.Controllers
             {
                 await _paymentService.MarkAsPaid(txnRef);
 
-                // Redirect về FE khi thành công
-                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?txnRef={txnRef}");
+                var payment = await _paymentService.GetByTxnRefAsync(txnRef); // lấy orderId
+                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?txnRef={txnRef}&orderId={payment.OrderId}");
             }
 
-            // Redirect về FE khi thất bại
             return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
         }
+
 
 
         // (tuỳ VNPay/hoặc muốn bắt notify dạng POST)

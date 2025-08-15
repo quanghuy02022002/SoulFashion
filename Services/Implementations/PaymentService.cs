@@ -157,6 +157,17 @@ namespace Services.Implementations
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
         }
+        public async Task<Payment> GetByTxnRefAsync(string txnRef)
+        {
+            if (string.IsNullOrWhiteSpace(txnRef))
+                throw new ArgumentException("Transaction reference cannot be empty");
+
+            var payment = await _repo.GetByTxnRefAsync(txnRef);
+            if (payment == null)
+                throw new Exception($"Payment not found for transactionRef: {txnRef}");
+
+            return payment;
+        }
 
     }
 }

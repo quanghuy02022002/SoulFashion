@@ -15,6 +15,8 @@ namespace Services.Interfaces
         Task DeleteAsync(int paymentId);
         Task UpdateAsync(PaymentDto dto);
         Task MarkAsPaid(string txnRef);
+        Task<Payment> GetByTxnRefAsync(string txnRef);
+
     }
 
 }
