@@ -58,7 +58,7 @@ namespace Services.Implementations
                 }
 
                 // Tạo QR code URL cho Vietcombank
-                var qrCodeUrl = GenerateVietcombankQrCode(orderId, order.TotalPrice.Value);
+                var qrCodeUrl = await GenerateVietcombankQrCode(orderId, order.TotalPrice.Value);
 
                 return new BankTransferInfoDto
                 {
@@ -186,16 +186,22 @@ namespace Services.Implementations
             }
         }
 
-        private string GenerateVietcombankQrCode(int orderId, decimal amount)
+        private async Task<string> GenerateVietcombankQrCode(int orderId, decimal amount)
         {
-            // Tạo QR code theo chuẩn VietQR để quét trực tiếp từ app ngân hàng
+            // Tạo QR code đẹp như VietQR.net
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Tạo dữ liệu QR theo chuẩn VietQR
-            var qrData = BuildVietQRData(amount, transferContent);
+            // Sử dụng API của VietQR.net để tạo QR code đẹp
+            var qrCodeUrl = $"https://vietqr.net/api/qr-code?" +
+                           $"bank=VCB" +
+                           $"&account={_accountNumber}" +
+                           $"&name={Uri.EscapeDataString(_accountName)}" +
+                           $"&amount={amount:N0}" +
+                           $"&content={Uri.EscapeDataString(transferContent)}" +
+                           $"&template=default" +
+                           $"&size=400";
             
-            // Tạo URL QR code
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
+            return qrCodeUrl;
         }
 
         private string BuildVietQRData(decimal amount, string transferContent)
