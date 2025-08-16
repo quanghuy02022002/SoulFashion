@@ -146,16 +146,40 @@ namespace SoulFashion.Controllers
         {
             try
             {
+                // Validate input
+                if (dto == null || dto.OrderId <= 0)
+                    return BadRequest(new { message = "Invalid order information", orderId = dto?.OrderId });
+
+                Console.WriteLine($"PayOS: Creating payment link for Order #{dto.OrderId}");
+
+                // Tạo payment record trước
                 await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
 
+                // Tạo PayOS payment link
                 var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
 
-                return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
+                Console.WriteLine($"PayOS: Successfully created payment link for Order #{dto.OrderId}");
+
+                return Ok(new { 
+                    success = true,
+                    message = "Payment link created successfully",
+                    paymentUrl = checkoutUrl, 
+                    qrCode, 
+                    orderId = dto.OrderId,
+                    raw = rawResponse 
+                });
             }
             catch (Exception ex)
             {
-                Console.WriteLine("PayOS create error: " + ex);
-                return StatusCode(500, new { message = "PayOS create error", error = ex.Message });
+                Console.WriteLine($"PayOS CreatePayOsLink Error for Order #{dto?.OrderId}: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Failed to create PayOS payment link", 
+                    error = ex.Message,
+                    orderId = dto?.OrderId
+                });
             }
         }
 
@@ -164,22 +188,59 @@ namespace SoulFashion.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> PayOsWebhook()
         {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var body = await reader.ReadToEndAsync();
-            var signature = Request.Headers["x-signature"].ToString();
+            try
+            {
+                using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+                var body = await reader.ReadToEndAsync();
+                var signature = Request.Headers["x-signature"].ToString();
 
-            if (!_payOsService.VerifyWebhook(body, signature))
-                return Unauthorized(new { message = "Invalid signature" });
+                Console.WriteLine($"PayOS Webhook: Received webhook from PayOS");
+                Console.WriteLine($"PayOS Webhook: Body length: {body?.Length ?? 0}");
+                Console.WriteLine($"PayOS Webhook: Signature header: {signature}");
 
-            using var doc = JsonDocument.Parse(body);
-            var data = doc.RootElement.GetProperty("data");
-            var status = data.GetProperty("status").GetString();
-            var orderId = data.GetProperty("orderId").GetInt32();
+                if (!_payOsService.VerifyWebhook(body, signature))
+                {
+                    Console.WriteLine("PayOS Webhook: Invalid signature, rejecting webhook");
+                    return Unauthorized(new { 
+                        success = false,
+                        message = "Invalid signature",
+                        timestamp = DateTime.UtcNow
+                    });
+                }
 
-            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
-                await _paymentService.MarkAsPaid(orderId.ToString());
+                using var doc = JsonDocument.Parse(body);
+                var data = doc.RootElement.GetProperty("data");
+                var status = data.GetProperty("status").GetString();
+                var orderId = data.GetProperty("orderId").GetInt32();
 
-            return Ok(new { message = "OK" });
+                Console.WriteLine($"PayOS Webhook: Valid webhook for Order #{orderId}, Status: {status}");
+
+                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _paymentService.MarkAsPaid(orderId.ToString());
+                    Console.WriteLine($"PayOS Webhook: Order #{orderId} marked as paid successfully");
+                }
+
+                return Ok(new { 
+                    success = true,
+                    message = "Webhook processed successfully",
+                    orderId,
+                    status,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"PayOS Webhook Error: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Webhook processing failed",
+                    error = ex.Message,
+                    timestamp = DateTime.UtcNow
+                });
+            }
         }
 
         // Return URL
@@ -187,12 +248,25 @@ namespace SoulFashion.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> PayOsReturn([FromQuery] int orderId, [FromQuery] string status)
         {
-            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                await _paymentService.MarkAsPaid(orderId.ToString());
-                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?orderId={orderId}");
+                Console.WriteLine($"PayOS Return: Order #{orderId}, Status: {status}");
+
+                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _paymentService.MarkAsPaid(orderId.ToString());
+                    Console.WriteLine($"PayOS Return: Order #{orderId} marked as paid, redirecting to success page");
+                    return Redirect($"https://soul-of-fashion.vercel.app/payment-success?orderId={orderId}");
+                }
+
+                Console.WriteLine($"PayOS Return: Order #{orderId} not paid, redirecting to failed page");
+                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
             }
-            return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+            catch (Exception ex)
+            {
+                Console.WriteLine($"PayOS Return Error for Order #{orderId}: {ex.Message}");
+                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+            }
         }
     }
 }
