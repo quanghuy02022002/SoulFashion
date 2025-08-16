@@ -151,11 +151,12 @@ namespace SoulFashion.Controllers
             try
             {
                 // orderCode số nguyên ≤ 9007199254740991
-                long unixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                long orderCodeNum = unixMs % 9000000000000000 + dto.OrderId;
+                long orderCodeNum = (DateTime.UtcNow.Ticks + dto.OrderId) % 9007199254740991;
                 string orderCode = orderCodeNum.ToString();
 
+                // Lưu Payment "pending"
                 await _paymentService.CreatePaymentAsync(dto, orderCode);
+
                 var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
 
                 return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
