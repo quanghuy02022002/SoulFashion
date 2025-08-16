@@ -188,14 +188,81 @@ namespace Services.Implementations
 
         private string GenerateVietcombankQrCode(int orderId, decimal amount)
         {
-            // Tạo QR code đơn giản với thông tin chuyển khoản
+            // Tạo QR code theo chuẩn VietQR để quét trực tiếp từ app ngân hàng
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Tạo dữ liệu QR đơn giản
-            var qrData = $"Ngân hàng: {_bankName}\nSố TK: {_accountNumber}\nTên TK: {_accountName}\nSố tiền: {amount:N0} VND\nNội dung: {transferContent}";
+            // Tạo dữ liệu QR theo chuẩn VietQR
+            var qrData = BuildVietQRData(amount, transferContent);
             
             // Tạo URL QR code
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(qrData)}&format=png&margin=10&ecc=M";
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
+        }
+
+        private string BuildVietQRData(decimal amount, string transferContent)
+        {
+            // Tạo VietQR theo chuẩn EMV QR Code
+            var data = new List<string>();
+            
+            // Payload Format Indicator
+            data.Add("000201");
+            
+            // Point of Initiation Method (12 = Static QR)
+            data.Add("010212");
+            
+            // Merchant Account Information - Vietcombank
+            var merchantInfo = "0016A000000727012900";
+            merchantInfo += "0010" + _accountNumber.Length.ToString("D2") + _accountNumber;
+            data.Add("26" + merchantInfo.Length.ToString("D2") + merchantInfo);
+            
+            // Merchant Category Code (5999 = Miscellaneous)
+            data.Add("52045999");
+            
+            // Transaction Currency (704 = VND)
+            data.Add("5303704");
+            
+            // Transaction Amount
+            var amountStr = amount.ToString("F0");
+            data.Add("54" + amountStr.Length.ToString("D2") + amountStr);
+            
+            // Country Code
+            data.Add("5802VN");
+            
+            // Merchant Name
+            var merchantName = "SOUL FASHION";
+            data.Add("59" + merchantName.Length.ToString("D2") + merchantName);
+            
+            // Additional Data Field Template
+            var additionalData = "00" + transferContent.Length.ToString("D2") + transferContent;
+            data.Add("62" + additionalData.Length.ToString("D2") + additionalData);
+            
+            // CRC
+            var qrString = string.Join("", data);
+            var crc = CalculateCRC16(qrString);
+            data.Add("6304" + crc);
+            
+            return string.Join("", data);
+        }
+
+        private string CalculateCRC16(string data)
+        {
+            ushort crc = 0xFFFF;
+            foreach (char c in data)
+            {
+                crc ^= (ushort)c;
+                for (int i = 0; i < 8; i++)
+                {
+                    if ((crc & 0x0001) != 0)
+                    {
+                        crc >>= 1;
+                        crc ^= 0x8408;
+                    }
+                    else
+                    {
+                        crc >>= 1;
+                    }
+                }
+            }
+            return crc.ToString("X4");
         }
     }
 }
