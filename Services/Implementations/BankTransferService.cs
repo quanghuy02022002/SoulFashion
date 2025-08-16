@@ -82,7 +82,7 @@ namespace Services.Implementations
             }
         }
 
-        public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
+                public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
         {
             try
             {
@@ -99,19 +99,39 @@ namespace Services.Implementations
                     return false;
                 }
 
-                // Kiểm tra số tiền có khớp không
-                if (Math.Abs(order.TotalPrice.Value - amount) > 0.01m)
-                {
-                    _logger.LogWarning("Amount mismatch for Order #{OrderId}: Expected {Expected}, Got {Actual}", 
-                        orderId, order.TotalPrice.Value, amount);
-                    return false;
-                }
-
                 // Kiểm tra xem transaction ID đã tồn tại chưa
                 var existingTransfer = await _bankTransferRepo.GetByTransactionIdAsync(transactionId);
                 if (existingTransfer != null)
                 {
-                    _logger.LogWarning("Transaction ID {TransactionId} already exists", transactionId);
+                    // Nếu transaction ID đã tồn tại, kiểm tra xem có phải cùng order không
+                    if (existingTransfer.OrderId != orderId)
+                    {
+                        _logger.LogWarning("Transaction ID {TransactionId} already exists for different order {DifferentOrderId}", 
+                            transactionId, existingTransfer.OrderId);
+                        return false;
+                    }
+                    
+                    // Nếu đã verify rồi cho cùng order, trả về true (không báo lỗi)
+                    if (existingTransfer.Status == "Completed")
+                    {
+                        _logger.LogInformation("Transaction ID {TransactionId} already verified for Order #{OrderId}", 
+                            transactionId, orderId);
+                        return true;
+                    }
+                }
+
+                // Kiểm tra số tiền có khớp không
+                if (Math.Abs(order.TotalPrice.Value - amount) > 0.01m)
+                {
+                    _logger.LogWarning("Amount mismatch for Order #{OrderId}: Expected {Expected}, Got {Actual}",
+                        orderId, order.TotalPrice.Value, amount);
+                    return false;
+                }
+
+                // Kiểm tra xem order đã được thanh toán chưa
+                if (order.Status == "Paid")
+                {
+                    _logger.LogWarning("Order #{OrderId} is already paid", orderId);
                     return false;
                 }
 
@@ -164,9 +184,14 @@ namespace Services.Implementations
                     return new BankTransferStatusDto
                     {
                         OrderId = orderId,
-                        Status = "Not Found"
+                        Status = "Not Found",
+                        Message = "Không tìm thấy thông tin chuyển khoản cho đơn hàng này"
                     };
                 }
+
+                // Kiểm tra thêm trạng thái order
+                var order = await _orderRepo.GetByIdAsync(orderId);
+                var orderStatus = order?.Status ?? "Unknown";
 
                 return new BankTransferStatusDto
                 {
@@ -175,7 +200,9 @@ namespace Services.Implementations
                     TransactionId = bankTransfer.TransactionId,
                     TransferDate = bankTransfer.TransferDate,
                     Amount = bankTransfer.Amount,
-                    Note = bankTransfer.Note
+                    Note = bankTransfer.Note,
+                    OrderStatus = orderStatus,
+                    Message = GetStatusMessage(bankTransfer.Status, orderStatus)
                 };
             }
             catch (Exception ex)
@@ -184,9 +211,23 @@ namespace Services.Implementations
                 return new BankTransferStatusDto
                 {
                     OrderId = orderId,
-                    Status = "Error"
+                    Status = "Error",
+                    Message = "Có lỗi xảy ra khi lấy trạng thái chuyển khoản"
                 };
             }
+        }
+
+        private string GetStatusMessage(string transferStatus, string orderStatus)
+        {
+            return transferStatus switch
+            {
+                "Completed" when orderStatus == "Paid" => "Giao dịch đã hoàn thành và đơn hàng đã được thanh toán",
+                "Completed" when orderStatus != "Paid" => "Giao dịch đã hoàn thành nhưng đơn hàng chưa được cập nhật",
+                "Pending" => "Đang chờ xác thực chuyển khoản",
+                "Failed" => "Giao dịch thất bại",
+                "Not Found" => "Không tìm thấy thông tin chuyển khoản",
+                _ => "Trạng thái không xác định"
+            };
         }
 
         private async Task<string> GenerateVietcombankQrCode(int orderId, decimal amount)

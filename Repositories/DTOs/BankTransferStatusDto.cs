@@ -10,6 +10,8 @@ namespace Repositories.DTOs
         public DateTime? TransferDate { get; set; }
         public decimal? Amount { get; set; }
         public string? Note { get; set; }
+        public string? OrderStatus { get; set; }
+        public string? Message { get; set; }
     }
 }
 
