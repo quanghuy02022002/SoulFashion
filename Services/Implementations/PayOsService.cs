@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Repositories.Interfaces;
 using Services.Interfaces;
 using System.Net.Http;
@@ -13,6 +14,7 @@ namespace Services.Implementations
     {
         private readonly HttpClient _http;
         private readonly IOrderRepository _orderRepo;
+        private readonly ILogger<PayOsService> _logger;
         private readonly string _clientId;
         private readonly string _apiKey;
         private readonly string _createUrl;
@@ -20,10 +22,11 @@ namespace Services.Implementations
         private readonly string _cancelUrl;
         private readonly string _checksumKey;
 
-        public PayOsService(IConfiguration config, IHttpClientFactory httpClientFactory, IOrderRepository orderRepo)
+        public PayOsService(IConfiguration config, IHttpClientFactory httpClientFactory, IOrderRepository orderRepo, ILogger<PayOsService> logger)
         {
             _http = httpClientFactory.CreateClient();
             _orderRepo = orderRepo;
+            _logger = logger;
 
             _clientId = config["PayOS:ClientId"] ?? "";
             _apiKey = config["PayOS:ApiKey"] ?? "";
@@ -32,13 +35,8 @@ namespace Services.Implementations
             _returnUrl = config["PayOS:ReturnUrl"] ?? "";
             _cancelUrl = config["PayOS:CancelUrl"] ?? "";
 
-            Console.WriteLine($"PayOS Service Initialized:");
-            Console.WriteLine($"  ClientId: {_clientId}");
-            Console.WriteLine($"  ApiKey: {_apiKey}");
-            Console.WriteLine($"  ChecksumKey: {_checksumKey}");
-            Console.WriteLine($"  CreateUrl: {_createUrl}");
-            Console.WriteLine($"  ReturnUrl: {_returnUrl}");
-            Console.WriteLine($"  CancelUrl: {_cancelUrl}");
+            _logger.LogInformation("PayOS Service Initialized: ClientId={ClientId}, ApiKey={ApiKey}, CreateUrl={CreateUrl}", 
+                _clientId, _apiKey, _createUrl);
         }
 
         // Tạo link thanh toán PayOS
@@ -52,7 +50,7 @@ namespace Services.Implementations
                 if (order.TotalPrice == null)
                     throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-                Console.WriteLine($"PayOS: Creating payment link for Order #{orderId}, Amount: {order.TotalPrice.Value}");
+                _logger.LogInformation("PayOS: Creating payment link for Order #{OrderId}, Amount: {TotalPrice}", orderId, order.TotalPrice.Value);
 
                 // Thử các format signature khác nhau
                 var signatureFormats = new[]
@@ -87,11 +85,20 @@ namespace Services.Implementations
                             signature = signature
                         };
 
-                        Console.WriteLine($"PayOS: Trying signature: {signature}");
-                        Console.WriteLine($"PayOS Request:");
-                        Console.WriteLine($"  URL: {_createUrl}");
-                        Console.WriteLine($"  Headers: x-client-id={_clientId}, x-api-key={_apiKey}");
-                        Console.WriteLine($"  Payload: {JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true })}");
+                        _logger.LogInformation("PayOS: Trying signature: {Signature}", signature);
+                        _logger.LogInformation("PayOS Request:");
+                        _logger.LogInformation("  URL: {CreateUrl}", _createUrl);
+                        _logger.LogInformation("  Headers: x-client-id={ClientId}, x-api-key={ApiKey}", _clientId, _apiKey);
+                        
+                        try
+                        {
+                            var payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+                            _logger.LogInformation("  Payload: {Payload}", payloadJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "PayOS: Error serializing payload");
+                        }
 
                         var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
                         {
@@ -104,51 +111,64 @@ namespace Services.Implementations
                         var res = await _http.SendAsync(req);
                         var raw = await res.Content.ReadAsStringAsync();
 
-                        Console.WriteLine($"PayOS Response:");
-                        Console.WriteLine($"  Status: {res.StatusCode}");
-                        Console.WriteLine($"  Content-Type: {res.Content.Headers.ContentType}");
-                        Console.WriteLine($"  Body: {raw}");
+                        _logger.LogInformation("PayOS Response:");
+                        _logger.LogInformation("  Status: {StatusCode}", res.StatusCode);
+                        _logger.LogInformation("  Content-Type: {ContentType}", res.Content.Headers.ContentType);
+                        _logger.LogInformation("  Body: {RawBody}", raw);
 
                         if (!res.IsSuccessStatusCode)
                         {
-                            Console.WriteLine($"PayOS: HTTP error, trying next signature format");
+                            _logger.LogWarning("PayOS: HTTP error, trying next signature format");
                             continue;
                         }
 
-                        using var doc = JsonDocument.Parse(raw);
-                        var root = doc.RootElement;
-
-                        if (root.TryGetProperty("code", out var codeEl))
+                        JsonDocument doc;
+                        try
                         {
-                            var code = codeEl.GetString();
-                            if (code == "00" || code == "0")
-                            {
-                                if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind != JsonValueKind.Null)
-                                {
-                                    string checkoutUrl = dataEl.GetProperty("checkoutUrl").GetString() 
-                                        ?? throw new Exception($"checkoutUrl not found in response: {raw}");
-                                    
-                                    string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
+                            doc = JsonDocument.Parse(raw);
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogError(ex, "PayOS: Invalid JSON response: {RawBody}", raw);
+                            continue;
+                        }
 
-                                    Console.WriteLine($"PayOS: SUCCESS with signature: {signature}");
-                                    return (checkoutUrl, qrCode, raw);
+                        using (doc)
+                        {
+                            var root = doc.RootElement;
+
+                            if (root.TryGetProperty("code", out var codeEl))
+                            {
+                                var code = codeEl.GetString();
+                                if (code == "00" || code == "0")
+                                {
+                                    if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind != JsonValueKind.Null)
+                                    {
+                                        string checkoutUrl = dataEl.GetProperty("checkoutUrl").GetString() 
+                                            ?? throw new Exception($"checkoutUrl not found in response: {raw}");
+                                        
+                                        string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
+
+                                        _logger.LogInformation("PayOS: SUCCESS with signature: {Signature}", signature);
+                                        return (checkoutUrl, qrCode, raw);
+                                    }
                                 }
-                            }
-                            else if (code == "201") // Signature error, try next format
-                            {
-                                Console.WriteLine($"PayOS: Signature error (Code: 201), trying next format");
-                                continue;
-                            }
-                            else
-                            {
-                                var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
-                                throw new Exception($"PayOS business error: {desc} (Code: {code})");
+                                else if (code == "201") // Signature error, try next format
+                                {
+                                    _logger.LogWarning("PayOS: Signature error (Code: 201), trying next format");
+                                    continue;
+                                }
+                                else
+                                {
+                                    var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
+                                    throw new Exception($"PayOS business error: {desc} (Code: {code})");
+                                }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"PayOS: Error with signature format: {ex.Message}");
+                        _logger.LogError(ex, "PayOS: Error with signature format: {Message}", ex.Message);
                         continue;
                     }
                 }
@@ -157,7 +177,7 @@ namespace Services.Implementations
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS CreatePaymentLinkAsync Error: {ex.Message}");
+                _logger.LogError(ex, "PayOS CreatePaymentLinkAsync Error: {Message}", ex.Message);
                 throw;
             }
         }
@@ -166,21 +186,30 @@ namespace Services.Implementations
         {
             using var md5 = MD5.Create();
             var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(data));
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            
+            _logger.LogDebug("PayOS MD5 Signature: Data={Data}, Signature={Signature}", data, signature);
+            return signature;
         }
 
         private string GenerateHMACSignature(string data, string key)
         {
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            
+            _logger.LogDebug("PayOS HMAC-SHA256 Signature: Data={Data}, Key={Key}, Signature={Signature}", data, key, signature);
+            return signature;
         }
 
         private string GenerateSHA1Signature(string data)
         {
             using var sha1 = SHA1.Create();
             var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(data));
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            
+            _logger.LogDebug("PayOS SHA1 Signature: Data={Data}, Signature={Signature}", data, signature);
+            return signature;
         }
 
         // Xác thực webhook từ PayOS
@@ -190,13 +219,13 @@ namespace Services.Implementations
             {
                 if (string.IsNullOrWhiteSpace(signatureHeader))
                 {
-                    Console.WriteLine("PayOS Webhook: Empty signature header");
+                    _logger.LogWarning("PayOS Webhook: Empty signature header");
                     return false;
                 }
 
-                Console.WriteLine($"PayOS Webhook: Verifying webhook");
-                Console.WriteLine($"  Raw Body: {rawBody}");
-                Console.WriteLine($"  Received Signature: {signatureHeader}");
+                _logger.LogInformation("PayOS Webhook: Verifying webhook");
+                _logger.LogInformation("  Raw Body: {RawBody}", rawBody);
+                _logger.LogInformation("  Received Signature: {ReceivedSignature}", signatureHeader);
 
                 // Verify với checksumKey
                 using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
@@ -206,16 +235,16 @@ namespace Services.Implementations
 
                 var isValid = string.Equals(computed, received, StringComparison.Ordinal);
 
-                Console.WriteLine($"PayOS Webhook Verification:");
-                Console.WriteLine($"  Computed Signature: {computed}");
-                Console.WriteLine($"  Received Signature: {received}");
-                Console.WriteLine($"  Is Valid: {isValid}");
+                _logger.LogInformation("PayOS Webhook Verification:");
+                _logger.LogInformation("  Computed Signature: {ComputedSignature}", computed);
+                _logger.LogInformation("  Received Signature: {ReceivedSignature}", received);
+                _logger.LogInformation("  Is Valid: {IsValid}", isValid);
 
                 return isValid;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS VerifyWebhook Error: {ex.Message}");
+                _logger.LogError(ex, "PayOS VerifyWebhook Error: {Message}", ex.Message);
                 return false;
             }
         }
