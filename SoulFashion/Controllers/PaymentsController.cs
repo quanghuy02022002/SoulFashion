@@ -148,23 +148,18 @@ namespace SoulFashion.Controllers
         [HttpPost("payos")]
         public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
         {
-            try
+            // 1) Lưu record Payment pending
+            await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
+
+            // 2) Tạo link PayOS
+            var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
+
+            return Ok(new
             {
-                // orderCode số nguyên ≤ 9007199254740991
-                long orderCodeNum = (DateTime.UtcNow.Ticks + dto.OrderId) % 9007199254740991;
-                string orderCode = orderCodeNum.ToString();
-
-                // Lưu Payment "pending"
-                await _paymentService.CreatePaymentAsync(dto, orderCode);
-
-                var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
-
-                return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = ex.Message, stack = ex.StackTrace });
-            }
+                paymentUrl = checkoutUrl,
+                qrCode,
+                raw = rawResponse
+            });
         }
 
         [HttpPost("payos-webhook")]
@@ -183,16 +178,16 @@ namespace SoulFashion.Controllers
             var status = data.GetProperty("status").GetString();
             var orderCode = data.GetProperty("orderCode").GetString();
 
-            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(orderCode))
+            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(orderCode))
             {
                 await _paymentService.MarkAsPaid(orderCode);
             }
 
             return Ok(new { message = "OK" });
         }
+    
 
-        [HttpGet("payos-return")]
+    [HttpGet("payos-return")]
         [AllowAnonymous]
         public async Task<IActionResult> PayOsReturn([FromQuery] string orderCode, [FromQuery] string status)
         {
