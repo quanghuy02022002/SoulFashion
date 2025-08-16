@@ -191,36 +191,82 @@ namespace Services.Implementations
 
         private async Task<string> GenerateVietcombankQrCode(int orderId, decimal amount)
         {
-            // Sử dụng dịch vụ VietQR.net chuyên nghiệp
+            // Tạo QR code theo chuẩn VietQR để app ngân hàng có thể quét trực tiếp
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Tạo URL QR code từ VietQR.net với giao diện đẹp
-            var qrCodeUrl = $"https://vietqr.net/qr-code?" +
-                           $"bank=VCB" +
-                           $"&account={_accountNumber}" +
-                           $"&name={Uri.EscapeDataString(_accountName)}" +
-                           $"&amount={amount:N0}" +
-                           $"&content={Uri.EscapeDataString(transferContent)}" +
-                           $"&template=default" +
-                           $"&size=400";
+            // Tạo dữ liệu QR theo chuẩn EMV QR Code (VietQR)
+            var qrData = BuildVietQRData(amount, transferContent);
             
-            // Fallback: Sử dụng QR Server nếu VietQR.net không hoạt động
-            try
+            // Sử dụng QR Server với cấu hình tối ưu
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
+        }
+
+        private string BuildVietQRData(decimal amount, string transferContent)
+        {
+            // Tạo VietQR theo chuẩn EMV QR Code cho Vietcombank
+            var data = new List<string>();
+            
+            // Payload Format Indicator (Static QR)
+            data.Add("000201");
+            
+            // Point of Initiation Method (Static QR)
+            data.Add("010212");
+            
+            // Merchant Account Information - Vietcombank
+            // A000000727012900 là mã BIN của Vietcombank
+            var merchantInfo = "0016A000000727012900";
+            merchantInfo += "0010" + _accountNumber.Length.ToString("D2") + _accountNumber;
+            data.Add("26" + merchantInfo.Length.ToString("D2") + merchantInfo);
+            
+            // Merchant Category Code (5999 = Miscellaneous)
+            data.Add("52045999");
+            
+            // Transaction Currency (704 = VND)
+            data.Add("5303704");
+            
+            // Transaction Amount
+            var amountStr = amount.ToString("F0");
+            data.Add("54" + amountStr.Length.ToString("D2") + amountStr);
+            
+            // Country Code (VN)
+            data.Add("5802VN");
+            
+            // Merchant Name
+            var merchantName = "SOUL FASHION";
+            data.Add("59" + merchantName.Length.ToString("D2") + merchantName);
+            
+            // Additional Data Field Template (Purpose of Transaction)
+            var additionalData = "00" + transferContent.Length.ToString("D2") + transferContent;
+            data.Add("62" + additionalData.Length.ToString("D2") + additionalData);
+            
+            // CRC
+            var qrString = string.Join("", data);
+            var crc = CalculateCRC16(qrString);
+            data.Add("6304" + crc);
+            
+            return string.Join("", data);
+        }
+
+        private string CalculateCRC16(string data)
+        {
+            ushort crc = 0xFFFF;
+            foreach (char c in data)
             {
-                var response = await _httpClient.GetAsync(qrCodeUrl);
-                if (response.IsSuccessStatusCode)
+                crc ^= (ushort)c;
+                for (int i = 0; i < 8; i++)
                 {
-                    return qrCodeUrl;
+                    if ((crc & 0x0001) != 0)
+                    {
+                        crc >>= 1;
+                        crc ^= 0x8408;
+                    }
+                    else
+                    {
+                        crc >>= 1;
+                    }
                 }
             }
-            catch
-            {
-                // Fallback to QR Server
-            }
-            
-            // Fallback: Sử dụng QR Server với format đơn giản
-            var qrData = $"VCB|{_accountNumber}|{_accountName}|{amount:N0}|{transferContent}";
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
+            return crc.ToString("X4");
         }
 
 
