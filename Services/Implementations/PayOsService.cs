@@ -13,15 +13,11 @@ namespace Services.Implementations
     {
         private readonly HttpClient _http;
         private readonly IOrderRepository _orderRepo;
-
         private readonly string _clientId;
         private readonly string _apiKey;
-        private readonly string _checksumKey;
         private readonly string _createUrl;
         private readonly string _returnUrl;
         private readonly string _cancelUrl;
-
-        private const long MAX_ORDER_CODE = 9007199254740991; // PayOS giới hạn số
 
         public PayOsService(IConfiguration config, IHttpClientFactory httpClientFactory, IOrderRepository orderRepo)
         {
@@ -30,33 +26,28 @@ namespace Services.Implementations
 
             _clientId = config["PayOS:ClientId"] ?? "";
             _apiKey = config["PayOS:ApiKey"] ?? "";
-            _checksumKey = config["PayOS:ChecksumKey"] ?? "";
-            _createUrl = config["PayOS:CreateUrl"] ?? "https://api-merchant.payos.vn/v2/payment-requests";
+            _createUrl = config["PayOS:CreateUrl"] ?? "";
             _returnUrl = config["PayOS:ReturnUrl"] ?? "";
             _cancelUrl = config["PayOS:CancelUrl"] ?? "";
         }
 
+        // Tạo link thanh toán PayOS
         public async Task<(string checkoutUrl, string? qrCode, string rawResponse)> CreatePaymentLinkAsync(int orderId)
         {
             var order = await _orderRepo.GetByIdAsync(orderId)
                         ?? throw new Exception($"Order #{orderId} not found");
 
-            if (order.TotalPrice is null)
+            if (order.TotalPrice == null)
                 throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-            var amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
-
-            // --- Tạo orderCode hợp lệ (số nhỏ, không vượt MAX_ORDER_CODE) ---
-            long orderCodeNum = orderId; // dùng trực tiếp orderId
-            string orderCode = orderCodeNum.ToString();
-
+            // Payload theo API test PayOS
             var payload = new
             {
-                orderCode = orderCode,
-                amount = amountVnd,
-                description = $"Thanh toán đơn hàng #{orderId}",
-                returnUrl = _returnUrl,
-                cancelUrl = _cancelUrl
+                paymentId = 0,
+                orderId = order.OrderId,
+                paymentMethod = "payos",
+                paymentStatus = "pending",
+                paidAt = DateTime.UtcNow
             };
 
             var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
@@ -70,28 +61,26 @@ namespace Services.Implementations
             var raw = await res.Content.ReadAsStringAsync();
 
             if (!res.IsSuccessStatusCode)
-                throw new Exception($"PayOS create link failed: {raw}");
+                throw new Exception($"PayOS create error: {raw}");
 
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("data", out var dataEl) || dataEl.ValueKind != JsonValueKind.Object)
+            if (!root.TryGetProperty("data", out var dataEl) || dataEl.ValueKind == JsonValueKind.Null)
                 throw new Exception($"PayOS response missing 'data': {raw}");
 
-            string? checkoutUrl = dataEl.TryGetProperty("checkoutUrl", out var urlEl) ? urlEl.GetString() : null;
+            string checkoutUrl = dataEl.GetProperty("checkoutUrl").GetString() ?? throw new Exception("checkoutUrl not found");
             string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
 
-            if (string.IsNullOrEmpty(checkoutUrl))
-                throw new Exception($"checkoutUrl not found in PayOS response: {raw}");
-
-            return (checkoutUrl!, qrCode, raw);
+            return (checkoutUrl, qrCode, raw);
         }
 
+        // Xác thực webhook từ PayOS
         public bool VerifyWebhook(string rawBody, string signatureHeader)
         {
             if (string.IsNullOrWhiteSpace(signatureHeader)) return false;
 
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_apiKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
             var computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
 
