@@ -52,6 +52,51 @@ namespace Services.Implementations
 
                 _logger.LogInformation("PayOS: Creating payment link for Order #{OrderId}, Amount: {TotalPrice}", orderId, order.TotalPrice.Value);
 
+                // Test kết nối đến PayOS trước
+                try
+                {
+                    _logger.LogInformation("PayOS: Testing connection to PayOS API...");
+                    var testReq = new HttpRequestMessage(HttpMethod.Get, "https://api-merchant.payos.vn");
+                    var testRes = await _http.SendAsync(testReq);
+                    _logger.LogInformation("PayOS: Test connection status: {StatusCode}", testRes.StatusCode);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("PayOS: Test connection failed: {Message}", ex.Message);
+                }
+
+                // Test với request đơn giản nhất
+                try
+                {
+                    _logger.LogInformation("PayOS: Testing minimal request to PayOS API...");
+                    var minimalPayload = new
+                    {
+                        orderCode = "TEST123",
+                        amount = 1000,
+                        description = "Test payment",
+                        cancelUrl = "https://example.com/cancel",
+                        returnUrl = "https://example.com/return"
+                    };
+
+                    var minimalReq = new HttpRequestMessage(HttpMethod.Post, _createUrl)
+                    {
+                        Content = JsonContent.Create(minimalPayload)
+                    };
+                    minimalReq.Headers.Add("x-client-id", _clientId);
+                    minimalReq.Headers.Add("x-api-key", _apiKey);
+
+                    var minimalRes = await _http.SendAsync(minimalReq);
+                    var minimalRaw = await minimalRes.Content.ReadAsStringAsync();
+
+                    _logger.LogInformation("PayOS: Minimal test response:");
+                    _logger.LogInformation("  Status: {StatusCode}", minimalRes.StatusCode);
+                    _logger.LogInformation("  Body: {RawBody}", minimalRaw);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("PayOS: Minimal test failed: {Message}", ex.Message);
+                }
+
                 // Thử các format signature khác nhau
                 var signatureFormats = new[]
                 {
@@ -74,13 +119,16 @@ namespace Services.Implementations
                     () => GenerateMD5Signature($"{order.OrderId}{order.TotalPrice.Value}")
                 };
 
+                int attemptCount = 0;
                 foreach (var signatureFunc in signatureFormats)
                 {
+                    attemptCount++;
                     try
                     {
                         var signature = signatureFunc();
                         
-                        _logger.LogInformation("PayOS: Trying signature format: {Signature}", signature ?? "NULL");
+                        _logger.LogInformation("PayOS: Attempt {AttemptCount}/6 - Trying signature: {Signature}", 
+                            attemptCount, signature ?? "NULL");
                         
                         // Tạo payload với signature này
                         var payload = new
@@ -93,7 +141,7 @@ namespace Services.Implementations
                             signature = signature
                         };
 
-                        _logger.LogInformation("PayOS Request:");
+                        _logger.LogInformation("PayOS: Request details:");
                         _logger.LogInformation("  URL: {CreateUrl}", _createUrl);
                         _logger.LogInformation("  Headers: x-client-id={ClientId}, x-api-key={ApiKey}", _clientId, _apiKey);
                         
@@ -133,7 +181,7 @@ namespace Services.Implementations
                         var res = await _http.SendAsync(req);
                         var raw = await res.Content.ReadAsStringAsync();
 
-                        _logger.LogInformation("PayOS Response:");
+                        _logger.LogInformation("PayOS: Response received:");
                         _logger.LogInformation("  Status: {StatusCode}", res.StatusCode);
                         _logger.LogInformation("  Content-Type: {ContentType}", res.Content.Headers.ContentType);
                         _logger.LogInformation("  Body: {RawBody}", raw);
@@ -199,7 +247,7 @@ namespace Services.Implementations
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "PayOS: Error with signature format: {Message}", ex.Message);
+                        _logger.LogError(ex, "PayOS: Error with signature format {AttemptCount}: {Message}", attemptCount, ex.Message);
                         continue;
                     }
                 }
@@ -207,6 +255,8 @@ namespace Services.Implementations
                 _logger.LogError("PayOS: All signature formats failed. Summary of attempts:");
                 _logger.LogError("  - Tried 6 different signature formats (including no signature)");
                 _logger.LogError("  - All returned business errors or signature errors");
+                _logger.LogError("  - Check if PayOS API endpoint is correct: {CreateUrl}", _createUrl);
+                _logger.LogError("  - Check if credentials are valid: ClientId={ClientId}, ApiKey={ApiKey}", _clientId, _apiKey);
                 throw new Exception("All signature formats failed. Check application logs for details.");
             }
             catch (Exception ex)
