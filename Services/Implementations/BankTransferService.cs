@@ -82,106 +82,110 @@ namespace Services.Implementations
             }
         }
 
-    public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
-{
-    try
-    {
-        var order = await _orderRepo.GetByIdAsync(orderId);
-        if (order == null)
+        public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
         {
-            _logger.LogWarning("Order #{OrderId} not found for bank transfer verification", orderId);
-            return false;
-        }
-
-        if (!order.TotalPrice.HasValue)
-        {
-            _logger.LogWarning("Order #{OrderId} has no total price", orderId);
-            return false;
-        }
-
-        // Kiểm tra xem transaction ID đã tồn tại chưa
-        var existingTransfer = await _bankTransferRepo.GetByTransactionIdAsync(transactionId);
-        if (existingTransfer != null)
-        {
-            // Nếu transaction ID đã tồn tại, kiểm tra xem có phải cùng order không
-            if (existingTransfer.OrderId != orderId)
+            try
             {
-                _logger.LogWarning("Transaction ID {TransactionId} already exists for different order {DifferentOrderId}", 
-                    transactionId, existingTransfer.OrderId);
-                return false;
-            }
-            
-            // Nếu đã verify rồi cho cùng order, trả về true (không báo lỗi)
-            if (existingTransfer.Status == "Completed")
-            {
-                _logger.LogInformation("Transaction ID {TransactionId} already verified for Order #{OrderId}", 
-                    transactionId, orderId);
+                var order = await _orderRepo.GetByIdAsync(orderId);
+                if (order == null)
+                {
+                    _logger.LogWarning("Order #{OrderId} not found for bank transfer verification", orderId);
+                    return false;
+                }
+
+                if (!order.TotalPrice.HasValue)
+                {
+                    _logger.LogWarning("Order #{OrderId} has no total price", orderId);
+                    return false;
+                }
+
+                // Kiểm tra transaction ID đã tồn tại chưa
+                var existingTransfer = await _bankTransferRepo.GetByTransactionIdAsync(transactionId);
+                if (existingTransfer != null)
+                {
+                    if (existingTransfer.OrderId != orderId)
+                    {
+                        _logger.LogWarning("Transaction ID {TransactionId} already exists for different order {DifferentOrderId}",
+                            transactionId, existingTransfer.OrderId);
+                        return false;
+                    }
+
+                    if (existingTransfer.Status == "Completed")
+                    {
+                        _logger.LogInformation("Transaction ID {TransactionId} already verified for Order #{OrderId}",
+                            transactionId, orderId);
+                        return true;
+                    }
+                }
+
+                // Kiểm tra số tiền
+                if (Math.Abs(order.TotalPrice.Value - amount) > 0.01m)
+                {
+                    _logger.LogWarning("Amount mismatch for Order #{OrderId}: Expected {Expected}, Got {Actual}",
+                        orderId, order.TotalPrice.Value, amount);
+                    return false;
+                }
+
+                // Kiểm tra trạng thái đơn hàng
+                if (order.Status == "Confirmed")
+                {
+                    _logger.LogWarning("Order #{OrderId} is already confirmed", orderId);
+                    return false;
+                }
+
+                // Nội dung ghi chú (Note)
+                var noteContent = $"{_transferContent}{orderId} - Verified transfer";
+
+                // Tạo hoặc cập nhật bank transfer
+                var bankTransfer = await _bankTransferRepo.GetByOrderIdAsync(orderId);
+                if (bankTransfer == null)
+                {
+                    bankTransfer = new BankTransfer
+                    {
+                        OrderId = orderId,
+                        TransactionId = transactionId,
+                        Amount = amount,
+                        TransferDate = transferDate,
+                        Status = "Completed",
+                        VerifiedAt = DateTime.UtcNow,
+                        Note = noteContent
+                    };
+                    await _bankTransferRepo.CreateAsync(bankTransfer);
+                }
+                else
+                {
+                    bankTransfer.TransactionId = transactionId;
+                    bankTransfer.Amount = amount;
+                    bankTransfer.TransferDate = transferDate;
+                    bankTransfer.Status = "Completed";
+                    bankTransfer.VerifiedAt = DateTime.UtcNow;
+                    bankTransfer.Note = noteContent;
+                    await _bankTransferRepo.UpdateAsync(bankTransfer);
+                }
+
+                // Cập nhật trạng thái đơn hàng
+                try
+                {
+                    order.Status = "Confirmed";
+                    await _orderRepo.UpdateAsync(order);
+                    _logger.LogInformation("Order #{OrderId} status updated to Confirmed", orderId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to update order status for Order #{OrderId}", orderId);
+                    throw;
+                }
+
+                _logger.LogInformation("Bank transfer verified successfully for Order #{OrderId}", orderId);
                 return true;
             }
-        }
-
-        // Kiểm tra số tiền có khớp không
-        if (Math.Abs(order.TotalPrice.Value - amount) > 0.01m)
-        {
-            _logger.LogWarning("Amount mismatch for Order #{OrderId}: Expected {Expected}, Got {Actual}",
-                orderId, order.TotalPrice.Value, amount);
-            return false;
-        }
-
-        // Kiểm tra xem order đã được thanh toán chưa
-        if (order.Status == "Confirmed")
-        {
-            _logger.LogWarning("Order #{OrderId} is already confirmed", orderId);
-            return false;
-        }
-
-        // Tạo hoặc cập nhật bank transfer record
-        var bankTransfer = await _bankTransferRepo.GetByOrderIdAsync(orderId);
-        if (bankTransfer == null)
-        {
-            bankTransfer = new BankTransfer
+            catch (Exception ex)
             {
-                OrderId = orderId,
-                TransactionId = transactionId,
-                Amount = amount,
-                TransferDate = transferDate,
-                Status = "Completed",
-                VerifiedAt = DateTime.UtcNow
-            };
-            await _bankTransferRepo.CreateAsync(bankTransfer);
-        }
-        else
-        {
-            bankTransfer.TransactionId = transactionId;
-            bankTransfer.Amount = amount;
-            bankTransfer.TransferDate = transferDate;
-            bankTransfer.Status = "Completed";
-            bankTransfer.VerifiedAt = DateTime.UtcNow;
-            await _bankTransferRepo.UpdateAsync(bankTransfer);
+                _logger.LogError(ex, "Error verifying bank transfer for Order #{OrderId}", orderId);
+                return false;
+            }
         }
 
-        // Cập nhật trạng thái đơn hàng
-        try 
-        {
-            order.Status = "Confirmed"; // Cập nhật thành "Confirmed"
-            await _orderRepo.UpdateAsync(order);
-            _logger.LogInformation("Order #{OrderId} status updated to Confirmed", orderId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to update order status for Order #{OrderId}", orderId);
-            throw;
-        }
-
-        _logger.LogInformation("Bank transfer verified successfully for Order #{OrderId}", orderId);
-        return true;
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error verifying bank transfer for Order #{OrderId}", orderId);
-        return false;
-    }
-}
         public async Task<BankTransferStatusDto> GetTransferStatusAsync(int orderId)
         {
             try
