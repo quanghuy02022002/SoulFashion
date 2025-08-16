@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Services.Interfaces;
+using Services.Implementations;
 
 namespace SoulFashion.Controllers
 {
@@ -20,19 +21,22 @@ namespace SoulFashion.Controllers
         private readonly IMomoService _momoService;
         private readonly IBankTransferService _bankTransferService;
         private readonly ILogger<PaymentsController> _logger; // Added for logging
-
+        private readonly IOrderService _orderService; // Added for order service
         public PaymentsController(
             IPaymentService paymentService,
             IVnPayService vnPayService,
             IMomoService momoService,
             IBankTransferService bankTransferService,
-            ILogger<PaymentsController> logger) // Added logger to constructor
+            ILogger<PaymentsController> logger,
+            IOrderService orderService) // Added logger to constructor
         {
             _paymentService = paymentService;
             _vnPayService = vnPayService;
             _momoService = momoService;
             _bankTransferService = bankTransferService;
             _logger = logger; // Initialize logger
+            _orderService = orderService;
+
         }
 
         [HttpGet("order/{orderId}")]
@@ -146,18 +150,41 @@ namespace SoulFashion.Controllers
             await _paymentService.UpdateAsync(dto);
             return Ok(new { message = "Cập nhật thành công" });
         }
-        // Bank Transfer endpoints
         [HttpGet("bank-transfer/{orderId}")]
         public async Task<IActionResult> GetBankTransferInfo(int orderId)
         {
             try
             {
                 _logger.LogInformation("Getting bank transfer info for Order #{OrderId}", orderId);
+
+                // ✅ Lấy order để biết TotalPrice
+                var order = await _orderService.GetOrderByIdAsync(orderId);
+                if (order == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Order not found"
+                    });
+                }
+
+                // ✅ Lấy bank info từ service (đọc từ appsettings)
                 var bankTransferInfo = await _bankTransferService.GetBankTransferInfoAsync(orderId);
+
                 return Ok(new
                 {
                     success = true,
-                    data = bankTransferInfo
+                    data = new
+                    {
+                        bankTransferInfo.BankName,
+                        bankTransferInfo.AccountNumber,
+                        bankTransferInfo.AccountName,
+                        bankTransferInfo.Branch,
+                        bankTransferInfo.QrCodeUrl,
+                        transferContent = $"SOULFASHION{orderId}", // nội dung CK
+                        amount = order.TotalPrice,                 // ✅ lấy từ OrderDetailDto.TotalPrice
+                        orderId = order.OrderId
+                    }
                 });
             }
             catch (Exception ex)
@@ -170,6 +197,7 @@ namespace SoulFashion.Controllers
                 });
             }
         }
+
 
         [HttpPost("bank-transfer/verify")]
         public async Task<IActionResult> VerifyBankTransfer([FromBody] BankTransferVerificationDto dto)
