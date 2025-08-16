@@ -25,17 +25,6 @@ namespace Services.Implementations
             _http = httpClientFactory.CreateClient();
             _orderRepo = orderRepo;
 
-            // Cấu hình HTTP client với SSL
-            _http.Timeout = TimeSpan.FromSeconds(30);
-            _http.DefaultRequestHeaders.Add("User-Agent", "SoulFashion-PayOS-Integration/1.0");
-            
-            // Thêm SSL configuration
-            var handler = new HttpClientHandler();
-            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
-            _http = new HttpClient(handler);
-            _http.Timeout = TimeSpan.FromSeconds(30);
-            _http.DefaultRequestHeaders.Add("User-Agent", "SoulFashion-PayOS-Integration/1.0");
-
             _clientId = config["PayOS:ClientId"] ?? "";
             _apiKey = config["PayOS:ApiKey"] ?? "";
             _checksumKey = config["PayOS:ChecksumKey"] ?? "";
@@ -65,209 +54,70 @@ namespace Services.Implementations
 
                 Console.WriteLine($"PayOS: Creating payment link for Order #{orderId}, Amount: {order.TotalPrice.Value}");
 
-                // ✅ Test kết nối trước
-                try
+                // Tạo payload theo PayOS documentation
+                var payload = new
                 {
-                    Console.WriteLine("PayOS: Testing connection to PayOS...");
-                    var testResponse = await _http.GetAsync("https://api-merchant.payos.vn");
-                    Console.WriteLine($"PayOS: Test connection status: {testResponse.StatusCode}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"PayOS: Test connection failed: {ex.Message}");
-                }
-
-                // ✅ Thử các URL khác nhau của PayOS
-                var urls = new[]
-                {
-                    "https://api-merchant.payos.vn/v2/payment-requests", // URL chính thức
-                    "https://api.payos.vn/v2/payment-requests", // URL backup
-                    "https://api-merchant.payos.vn/v2/payment", // URL khác
-                    "https://api.payos.vn/v2/payment", // URL khác
-                    "https://api-merchant.payos.vn/v2/payment/create", // URL có thể đúng
-                    "https://api.payos.vn/v2/payment/create", // URL có thể đúng
-                    "https://api-merchant.payos.vn/v2/payment-request", // URL khác
-                    "https://api.payos.vn/v2/payment-request", // URL khác
-                    "https://api-merchant.payos.vn/v2/payment-requests/create", // URL khác
-                    "https://api.payos.vn/v2/payment-requests/create", // URL khác
-                    "https://api-merchant.payos.vn/v2/payment/create-payment", // URL khác
-                    "https://api.payos.vn/v2/payment/create-payment" // URL khác
+                    orderCode = order.OrderId.ToString(),
+                    amount = order.TotalPrice.Value,
+                    description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
+                    cancelUrl = _cancelUrl,
+                    returnUrl = _returnUrl,
+                    signature = GenerateSignature(order.OrderId.ToString(), order.TotalPrice.Value)
                 };
 
-                // ✅ Thử các format payload khác nhau
-                var payloads = new object[]
+                Console.WriteLine($"PayOS Request:");
+                Console.WriteLine($"  URL: {_createUrl}");
+                Console.WriteLine($"  Headers: x-client-id={_clientId}, x-api-key={_apiKey}");
+                Console.WriteLine($"  Payload: {JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true })}");
+
+                var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
                 {
-                    // Format 0: Đơn giản nhất - chỉ có orderCode và amount
-                    new
-                    {
-                        orderCode = order.OrderId.ToString(),
-                        amount = order.TotalPrice.Value
-                    },
-                    // Format 1: Không có signature (chỉ dùng headers)
-                    new
-                    {
-                        orderCode = order.OrderId.ToString(),
-                        amount = order.TotalPrice.Value,
-                        description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                        cancelUrl = _cancelUrl,
-                        returnUrl = _returnUrl
-                    },
-                    // Format 2: Với signature MD5
-                    new
-                    {
-                        orderCode = order.OrderId.ToString(),
-                        amount = order.TotalPrice.Value,
-                        description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                        cancelUrl = _cancelUrl,
-                        returnUrl = _returnUrl,
-                        signature = GenerateMD5Signature(order.OrderId.ToString(), order.TotalPrice.Value)
-                    },
-                    // Format 3: Với signature HMAC-SHA256
-                    new
-                    {
-                        orderCode = order.OrderId.ToString(),
-                        amount = order.TotalPrice.Value,
-                        description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                        cancelUrl = _cancelUrl,
-                        returnUrl = _returnUrl,
-                        signature = GenerateHMACSignature(order.OrderId.ToString(), order.TotalPrice.Value)
-                    },
-                    // Format 4: snake_case
-                    new
-                    {
-                        order_code = order.OrderId.ToString(),
-                        amount = order.TotalPrice.Value,
-                        description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                        cancel_url = _cancelUrl,
-                        return_url = _returnUrl
-                    }
+                    Content = JsonContent.Create(payload)
                 };
 
-                // Thử từng URL và từng format payload
-                foreach (var url in urls)
+                req.Headers.Add("x-client-id", _clientId);
+                req.Headers.Add("x-api-key", _apiKey);
+
+                var res = await _http.SendAsync(req);
+                var raw = await res.Content.ReadAsStringAsync();
+
+                Console.WriteLine($"PayOS Response:");
+                Console.WriteLine($"  Status: {res.StatusCode}");
+                Console.WriteLine($"  Content-Type: {res.Content.Headers.ContentType}");
+                Console.WriteLine($"  Body: {raw}");
+
+                if (!res.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"PayOS: Trying URL: {url}");
-                    
-                    for (int i = 0; i < payloads.Length; i++)
+                    throw new Exception($"PayOS API error: {res.StatusCode} - {raw}");
+                }
+
+                using var doc = JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("code", out var codeEl))
+                {
+                    var code = codeEl.GetString();
+                    if (code == "00" || code == "0")
                     {
-                        try
+                        if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind != JsonValueKind.Null)
                         {
-                            Console.WriteLine($"PayOS: Trying payload format {i + 1} with URL: {url}");
-                            var payload = payloads[i];
+                            string checkoutUrl = dataEl.GetProperty("checkoutUrl").GetString() 
+                                ?? throw new Exception($"checkoutUrl not found in response: {raw}");
                             
-                            var req = new HttpRequestMessage(HttpMethod.Post, url)
-                            {
-                                Content = JsonContent.Create(payload)
-                            };
+                            string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
 
-                            req.Headers.Add("x-client-id", _clientId);
-                            req.Headers.Add("x-api-key", _apiKey);
-
-                            Console.WriteLine($"PayOS Request {i + 1}:");
-                            Console.WriteLine($"  URL: {url}");
-                            Console.WriteLine($"  Headers: x-client-id={_clientId}, x-api-key={_apiKey}");
-                            Console.WriteLine($"  Payload: {JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true })}");
-
-                            var res = await _http.SendAsync(req);
-                            var raw = await res.Content.ReadAsStringAsync();
-
-                            Console.WriteLine($"PayOS Response {i + 1}:");
-                            Console.WriteLine($"  Status: {res.StatusCode}");
-                            Console.WriteLine($"  Content-Type: {res.Content.Headers.ContentType}");
-                            Console.WriteLine($"  Body Length: {raw?.Length ?? 0}");
-                            Console.WriteLine($"  Body Preview: {(raw?.Length > 200 ? raw.Substring(0, 200) + "..." : raw)}");
-
-                            // Kiểm tra nếu response là HTML
-                            if (raw?.Contains("<!doctype html>") == true || raw?.Contains("<html") == true)
-                            {
-                                Console.WriteLine($"PayOS: HTML response detected - URL {url} might be wrong");
-                                continue; // Thử URL khác
-                            }
-
-                            // Kiểm tra nếu response là error
-                            if (raw?.Contains("error") == true || raw?.Contains("Error") == true)
-                            {
-                                Console.WriteLine($"PayOS: Error response detected from URL {url}: {raw}");
-                                continue; // Thử URL khác
-                            }
-
-                            if (res.IsSuccessStatusCode)
-                            {
-                                try
-                                {
-                                    using var doc = JsonDocument.Parse(raw);
-                                    var root = doc.RootElement;
-
-                                    if (root.TryGetProperty("code", out var codeEl))
-                                    {
-                                        var code = codeEl.GetString();
-                                        if (code == "00" || code == "0")
-                                        {
-                                            if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind != JsonValueKind.Null)
-                                            {
-                                                string checkoutUrl = dataEl.GetProperty("checkoutUrl").GetString() 
-                                                    ?? throw new Exception($"checkoutUrl not found in response: {raw}");
-                                                
-                                                string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
-
-                                                Console.WriteLine($"PayOS: SUCCESS with URL {url} and payload format {i + 1}!");
-                                                return (checkoutUrl, qrCode, raw);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
-                                            Console.WriteLine($"PayOS: Business error with URL {url} and format {i + 1}: {desc} (Code: {code})");
-                                            
-                                            // Nếu là lỗi signature, tiếp tục thử format khác
-                                            if (desc.Contains("signature") || desc.Contains("kiểm tra"))
-                                                continue;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"PayOS: Response missing 'code' field from URL {url}: {raw}");
-                                    }
-                                }
-                                catch (JsonException ex)
-                                {
-                                    Console.WriteLine($"PayOS: Invalid JSON response from URL {url}: {ex.Message}");
-                                    Console.WriteLine($"PayOS: Raw response: {raw}");
-                                    continue; // Thử URL khác
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"PayOS: HTTP error {res.StatusCode} from URL {url}: {raw}");
-                            }
+                            Console.WriteLine($"PayOS: SUCCESS! Checkout URL: {checkoutUrl}");
+                            return (checkoutUrl, qrCode, raw);
                         }
-                        catch (HttpRequestException ex)
-                        {
-                            Console.WriteLine($"PayOS: HTTP request error with URL {url} and format {i + 1}: {ex.Message}");
-                            Console.WriteLine($"PayOS: Inner exception: {ex.InnerException?.Message}");
-                            continue;
-                        }
-                        catch (TaskCanceledException ex)
-                        {
-                            Console.WriteLine($"PayOS: Request timeout with URL {url} and format {i + 1}: {ex.Message}");
-                            continue;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"PayOS: Error with URL {url} and payload format {i + 1}: {ex.Message}");
-                            Console.WriteLine($"PayOS: Stack trace: {ex.StackTrace}");
-                            continue;
-                        }
+                    }
+                    else
+                    {
+                        var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
+                        throw new Exception($"PayOS business error: {desc} (Code: {code})");
                     }
                 }
 
-                Console.WriteLine("PayOS: All URLs and payload formats failed. Summary:");
-                Console.WriteLine($"  - Tried {urls.Length} different URLs");
-                Console.WriteLine($"  - Tried {payloads.Length} different payload formats");
-                Console.WriteLine($"  - Total attempts: {urls.Length * payloads.Length}");
-                Console.WriteLine("  - Check console logs above for detailed error information");
-                
-                throw new Exception("All URLs and payload formats failed. Check console logs for details.");
+                throw new Exception($"PayOS response missing 'code' field: {raw}");
             }
             catch (Exception ex)
             {
@@ -276,7 +126,7 @@ namespace Services.Implementations
             }
         }
 
-        private string GenerateMD5Signature(string orderCode, decimal amount)
+        private string GenerateSignature(string orderCode, decimal amount)
         {
             try
             {
@@ -286,7 +136,7 @@ namespace Services.Implementations
                 var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(data));
                 var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
                 
-                Console.WriteLine($"PayOS MD5 Signature:");
+                Console.WriteLine($"PayOS Signature:");
                 Console.WriteLine($"  Data: {data}");
                 Console.WriteLine($"  Signature: {signature}");
                 
@@ -294,31 +144,7 @@ namespace Services.Implementations
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS GenerateMD5Signature Error: {ex.Message}");
-                throw;
-            }
-        }
-
-        private string GenerateHMACSignature(string orderCode, decimal amount)
-        {
-            try
-            {
-                // Format: orderCode + amount (không có checksumKey trong data)
-                var data = $"{orderCode}{amount}";
-                using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
-                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-                var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-                
-                Console.WriteLine($"PayOS HMAC-SHA256 Signature:");
-                Console.WriteLine($"  Data: {data}");
-                Console.WriteLine($"  ChecksumKey: {_checksumKey}");
-                Console.WriteLine($"  Signature: {signature}");
-                
-                return signature;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"PayOS GenerateHMACSignature Error: {ex.Message}");
+                Console.WriteLine($"PayOS GenerateSignature Error: {ex.Message}");
                 throw;
             }
         }
