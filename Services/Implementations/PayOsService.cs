@@ -66,7 +66,7 @@ namespace Services.Implementations
                 // Headers theo PayOS API spec
                 req.Headers.Add("x-client-id", _clientId);
                 req.Headers.Add("x-api-key", _apiKey);
-                req.Headers.Add("Content-Type", "application/json");
+                // Content-Type sẽ được tự động set bởi JsonContent
 
                 var res = await _http.SendAsync(req);
                 var raw = await res.Content.ReadAsStringAsync();
