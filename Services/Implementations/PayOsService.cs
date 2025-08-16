@@ -42,15 +42,14 @@ namespace Services.Implementations
             if (order.TotalPrice == null)
                 throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-            // ✅ Bỏ signature field - để PayOS tự xử lý authentication qua headers
+            // ✅ Thử field names khác mà PayOS có thể mong đợi
             var payload = new
             {
-                orderCode = order.OrderId.ToString(),
-                amount = order.TotalPrice.Value,
+                order_id = order.OrderId, // Thử order_id thay vì orderCode
+                total_amount = order.TotalPrice.Value, // Thử total_amount thay vì amount
                 description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                cancelUrl = _cancelUrl,
-                returnUrl = _returnUrl
-                // Không có signature field
+                cancel_url = _cancelUrl, // Thử cancel_url thay vì cancelUrl
+                return_url = _returnUrl // Thử return_url thay vì returnUrl
             };
 
             var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
