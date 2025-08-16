@@ -113,7 +113,6 @@ builder.Services.AddScoped<IReviewService, ReviewService>();
 // PayOS
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IPayOsService, PayOsService>();
-
 // ---- CORS ----
 builder.Services.AddCors(options =>
 {
