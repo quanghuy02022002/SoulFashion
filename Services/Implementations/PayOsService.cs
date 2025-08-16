@@ -80,10 +80,18 @@ namespace Services.Implementations
 
         private string GenerateSignature(string orderCode, decimal amount)
         {
-            var data = $"{orderCode}|{amount}|{_checksumKey}";
+            // ✅ Thử format 1: orderCode + amount (không có checksumKey trong data string)
+            var data = $"{orderCode}{amount}";
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            
+            // ✅ Log để debug
+            Console.WriteLine($"Debug - Data: {data}");
+            Console.WriteLine($"Debug - ChecksumKey: {_checksumKey}");
+            Console.WriteLine($"Debug - Signature: {signature}");
+            
+            return signature;
         }
 
         // Xác thực webhook từ PayOS
