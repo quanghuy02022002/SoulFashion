@@ -25,6 +25,10 @@ namespace Services.Implementations
             _http = httpClientFactory.CreateClient();
             _orderRepo = orderRepo;
 
+            // Cấu hình HTTP client
+            _http.Timeout = TimeSpan.FromSeconds(30);
+            _http.DefaultRequestHeaders.Add("User-Agent", "SoulFashion-PayOS-Integration/1.0");
+
             _clientId = config["PayOS:ClientId"] ?? "";
             _apiKey = config["PayOS:ApiKey"] ?? "";
             _checksumKey = config["PayOS:ChecksumKey"] ?? "";
@@ -60,7 +64,11 @@ namespace Services.Implementations
                     "https://api-merchant.payos.vn/v2/payment-requests", // URL chính thức
                     "https://api.payos.vn/v2/payment-requests", // URL backup
                     "https://api-merchant.payos.vn/v2/payment", // URL khác
-                    "https://api.payos.vn/v2/payment" // URL khác
+                    "https://api.payos.vn/v2/payment", // URL khác
+                    "https://api-merchant.payos.vn/v2/payment/create", // URL có thể đúng
+                    "https://api.payos.vn/v2/payment/create", // URL có thể đúng
+                    "https://api-merchant.payos.vn/v2/payment-request", // URL khác
+                    "https://api.payos.vn/v2/payment-request" // URL khác
                 };
 
                 // ✅ Thử các format payload khác nhau
@@ -147,6 +155,13 @@ namespace Services.Implementations
                                 continue; // Thử URL khác
                             }
 
+                            // Kiểm tra nếu response là error
+                            if (raw?.Contains("error") == true || raw?.Contains("Error") == true)
+                            {
+                                Console.WriteLine($"PayOS: Error response detected from URL {url}: {raw}");
+                                continue; // Thử URL khác
+                            }
+
                             if (res.IsSuccessStatusCode)
                             {
                                 try
@@ -180,13 +195,32 @@ namespace Services.Implementations
                                                 continue;
                                         }
                                     }
+                                    else
+                                    {
+                                        Console.WriteLine($"PayOS: Response missing 'code' field from URL {url}: {raw}");
+                                    }
                                 }
                                 catch (JsonException ex)
                                 {
                                     Console.WriteLine($"PayOS: Invalid JSON response from URL {url}: {ex.Message}");
+                                    Console.WriteLine($"PayOS: Raw response: {raw}");
                                     continue; // Thử URL khác
                                 }
                             }
+                            else
+                            {
+                                Console.WriteLine($"PayOS: HTTP error {res.StatusCode} from URL {url}: {raw}");
+                            }
+                        }
+                        catch (HttpRequestException ex)
+                        {
+                            Console.WriteLine($"PayOS: HTTP request error with URL {url} and format {i + 1}: {ex.Message}");
+                            continue;
+                        }
+                        catch (TaskCanceledException ex)
+                        {
+                            Console.WriteLine($"PayOS: Request timeout with URL {url} and format {i + 1}: {ex.Message}");
+                            continue;
                         }
                         catch (Exception ex)
                         {
