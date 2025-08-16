@@ -55,6 +55,9 @@ namespace Services.Implementations
                 // Thử các format signature khác nhau
                 var signatureFormats = new[]
                 {
+                    // Format 0: Không có signature (test xem PayOS có chấp nhận không)
+                    () => (string?)null,
+                    
                     // Format 1: MD5(checksumKey + orderCode + amount) - Phổ biến nhất
                     () => GenerateMD5Signature($"{_checksumKey}{order.OrderId}{order.TotalPrice.Value}"),
                     
@@ -65,7 +68,10 @@ namespace Services.Implementations
                     () => GenerateHMACSignature($"{order.OrderId}{order.TotalPrice.Value}", _checksumKey),
                     
                     // Format 4: SHA1(checksumKey + orderCode + amount)
-                    () => GenerateSHA1Signature($"{_checksumKey}{order.OrderId}{order.TotalPrice.Value}")
+                    () => GenerateSHA1Signature($"{_checksumKey}{order.OrderId}{order.TotalPrice.Value}"),
+                    
+                    // Format 5: MD5(orderCode + amount) - Đơn giản nhất
+                    () => GenerateMD5Signature($"{order.OrderId}{order.TotalPrice.Value}")
                 };
 
                 foreach (var signatureFunc in signatureFormats)
@@ -74,8 +80,17 @@ namespace Services.Implementations
                     {
                         var signature = signatureFunc();
                         
+                        _logger.LogInformation("PayOS: Trying signature format: {Signature}", signature ?? "NULL");
+                        
                         // Tạo payload với signature này
-                        var payload = new
+                        var payload = signature == null ? new
+                        {
+                            orderCode = order.OrderId.ToString(),
+                            amount = order.TotalPrice.Value,
+                            description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
+                            cancelUrl = _cancelUrl,
+                            returnUrl = _returnUrl
+                        } : new
                         {
                             orderCode = order.OrderId.ToString(),
                             amount = order.TotalPrice.Value,
@@ -85,7 +100,6 @@ namespace Services.Implementations
                             signature = signature
                         };
 
-                        _logger.LogInformation("PayOS: Trying signature: {Signature}", signature);
                         _logger.LogInformation("PayOS Request:");
                         _logger.LogInformation("  URL: {CreateUrl}", _createUrl);
                         _logger.LogInformation("  Headers: x-client-id={ClientId}, x-api-key={ApiKey}", _clientId, _apiKey);
@@ -108,6 +122,7 @@ namespace Services.Implementations
                         req.Headers.Add("x-client-id", _clientId);
                         req.Headers.Add("x-api-key", _apiKey);
 
+                        _logger.LogInformation("PayOS: Sending request...");
                         var res = await _http.SendAsync(req);
                         var raw = await res.Content.ReadAsStringAsync();
 
@@ -118,7 +133,7 @@ namespace Services.Implementations
 
                         if (!res.IsSuccessStatusCode)
                         {
-                            _logger.LogWarning("PayOS: HTTP error, trying next signature format");
+                            _logger.LogWarning("PayOS: HTTP error {StatusCode}, trying next signature format", res.StatusCode);
                             continue;
                         }
 
@@ -140,6 +155,8 @@ namespace Services.Implementations
                             if (root.TryGetProperty("code", out var codeEl))
                             {
                                 var code = codeEl.GetString();
+                                _logger.LogInformation("PayOS: Response code: {Code}", code);
+                                
                                 if (code == "00" || code == "0")
                                 {
                                     if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind != JsonValueKind.Null)
@@ -155,14 +172,21 @@ namespace Services.Implementations
                                 }
                                 else if (code == "201") // Signature error, try next format
                                 {
-                                    _logger.LogWarning("PayOS: Signature error (Code: 201), trying next format");
+                                    var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
+                                    _logger.LogWarning("PayOS: Signature error (Code: 201) - {Desc}, trying next format", desc);
                                     continue;
                                 }
                                 else
                                 {
                                     var desc = root.TryGetProperty("desc", out var descEl) ? descEl.GetString() : "Unknown error";
-                                    throw new Exception($"PayOS business error: {desc} (Code: {code})");
+                                    _logger.LogWarning("PayOS: Business error (Code: {Code}) - {Desc}, trying next format", code, desc);
+                                    continue;
                                 }
+                            }
+                            else
+                            {
+                                _logger.LogWarning("PayOS: Response missing 'code' field, trying next format");
+                                continue;
                             }
                         }
                     }
@@ -173,7 +197,10 @@ namespace Services.Implementations
                     }
                 }
 
-                throw new Exception("All signature formats failed. Check console logs for details.");
+                _logger.LogError("PayOS: All signature formats failed. Summary of attempts:");
+                _logger.LogError("  - Tried 6 different signature formats (including no signature)");
+                _logger.LogError("  - All returned business errors or signature errors");
+                throw new Exception("All signature formats failed. Check application logs for details.");
             }
             catch (Exception ex)
             {
