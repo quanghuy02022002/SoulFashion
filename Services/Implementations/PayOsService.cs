@@ -83,14 +83,7 @@ namespace Services.Implementations
                         _logger.LogInformation("PayOS: Trying signature format: {Signature}", signature ?? "NULL");
                         
                         // Tạo payload với signature này
-                        var payload = signature == null ? new
-                        {
-                            orderCode = order.OrderId.ToString(),
-                            amount = order.TotalPrice.Value,
-                            description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
-                            cancelUrl = _cancelUrl,
-                            returnUrl = _returnUrl
-                        } : new
+                        var payload = new
                         {
                             orderCode = order.OrderId.ToString(),
                             amount = order.TotalPrice.Value,
@@ -118,6 +111,20 @@ namespace Services.Implementations
                         {
                             Content = JsonContent.Create(payload)
                         };
+
+                        // Nếu signature là null, loại bỏ field signature khỏi JSON
+                        if (signature == null)
+                        {
+                            var jsonContent = JsonSerializer.Serialize(new
+                            {
+                                orderCode = order.OrderId.ToString(),
+                                amount = order.TotalPrice.Value,
+                                description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
+                                cancelUrl = _cancelUrl,
+                                returnUrl = _returnUrl
+                            });
+                            req.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                        }
 
                         req.Headers.Add("x-client-id", _clientId);
                         req.Headers.Add("x-api-key", _apiKey);
