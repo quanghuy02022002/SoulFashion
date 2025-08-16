@@ -148,18 +148,19 @@ namespace SoulFashion.Controllers
         [HttpPost("payos")]
         public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
         {
-            // 1) Lưu record Payment pending
-            await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
-
-            // 2) Tạo link PayOS
-            var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
-
-            return Ok(new
+            try
             {
-                paymentUrl = checkoutUrl,
-                qrCode,
-                raw = rawResponse
-            });
+                await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
+                var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
+
+                return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
+            }
+            catch (Exception ex)
+            {
+                // log vào console hoặc ILogger
+                Console.WriteLine("PayOS create error: " + ex);
+                return StatusCode(500, new { message = "Internal Server Error", error = ex.Message });
+            }
         }
 
         [HttpPost("payos-webhook")]
