@@ -233,8 +233,8 @@ namespace Services.Implementations
         {
             return transferStatus switch
             {
-                "Completed" when orderStatus == "Paid" => "Giao dịch đã hoàn thành và đơn hàng đã được thanh toán",
-                "Completed" when orderStatus != "Paid" => "Giao dịch đã hoàn thành nhưng đơn hàng chưa được cập nhật",
+                "Completed" when orderStatus == "Confirm" => "Giao dịch đã hoàn thành và đơn hàng đã được thanh toán",
+                "Completed" when orderStatus != "Confirm" => "Giao dịch đã hoàn thành nhưng đơn hàng chưa được cập nhật",
                 "Pending" => "Đang chờ xác thực chuyển khoản",
                 "Failed" => "Giao dịch thất bại",
                 "Not Found" => "Không tìm thấy thông tin chuyển khoản",
