@@ -43,7 +43,6 @@ namespace Services.Implementations
         /// </summary>
         public async Task<(string checkoutUrl, string? qrCode, string rawResponse)> CreatePaymentLinkAsync(int orderId, string orderCode, string? description = null)
         {
-            // 1) Lấy tổng tiền
             var order = await _orderRepo.GetByIdAsync(orderId)
                         ?? throw new Exception($"Order #{orderId} not found");
 
@@ -52,7 +51,7 @@ namespace Services.Implementations
 
             var amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
 
-            // 2) Build payload PayOS
+            // 1) Build payload
             var payload = new Dictionary<string, object>
             {
                 ["orderCode"] = orderCode,
@@ -62,14 +61,17 @@ namespace Services.Implementations
                 ["cancelUrl"] = _cancelUrl
             };
 
-            // 3) Tạo signature HMAC_SHA256
-            var payloadJson = JsonSerializer.Serialize(payload);
+            // 2) Tạo signature chuẩn PayOS (sort key alphabet)
+            var sorted = payload.OrderBy(k => k.Key).Select(k => $"{k.Key}={k.Value}");
+            var dataString = string.Join("&", sorted);
+
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payloadJson));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataString));
             var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
             payload["signature"] = signature;
 
-            // 4) Gửi request
+            // 3) Gửi request
             HttpResponseMessage res;
             string raw;
             try
@@ -92,7 +94,7 @@ namespace Services.Implementations
                 throw new Exception($"PayOS request failed: {ex.Message}");
             }
 
-            // 5) Parse response
+            // 4) Parse response
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
 

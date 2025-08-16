@@ -143,6 +143,7 @@ namespace SoulFashion.Controllers
             await _paymentService.UpdateAsync(dto);
             return Ok(new { message = "Cập nhật thành công" });
         }
+
         // ====== Tạo link PayOS ======
         [HttpPost("payos")]
         public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
@@ -154,7 +155,7 @@ namespace SoulFashion.Controllers
                 // Lưu payment pending
                 await _paymentService.CreatePaymentAsync(dto, orderCode);
 
-                // Tạo link
+                // Tạo link PayOS
                 var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
 
                 return Ok(new
@@ -166,7 +167,6 @@ namespace SoulFashion.Controllers
             }
             catch (Exception ex)
             {
-                // log error
                 return StatusCode(500, new { message = ex.Message, stack = ex.StackTrace });
             }
         }
@@ -200,7 +200,6 @@ namespace SoulFashion.Controllers
             }
             catch (Exception ex)
             {
-                // log error
                 return StatusCode(500, new { message = "Webhook error", error = ex.Message });
             }
         }
@@ -218,7 +217,7 @@ namespace SoulFashion.Controllers
                     var payment = await _paymentService.GetByTxnRefAsync(orderCode);
 
                     var feUrl = _config["FrontEnd:PaymentSuccessUrl"]
-                                ?? $"https://soul-of-fashion.vercel.app/payment-success";
+                                ?? "https://soul-of-fashion.vercel.app/payment-success";
 
                     return Redirect($"{feUrl}?txnRef={orderCode}&orderId={payment.OrderId}");
                 }
@@ -228,9 +227,8 @@ namespace SoulFashion.Controllers
 
                 return Redirect(failUrl);
             }
-            catch (Exception ex)
+            catch
             {
-                // nếu error redirect về trang fail
                 var failUrl = _config["FrontEnd:PaymentFailedUrl"]
                               ?? "https://soul-of-fashion.vercel.app/payment-failed";
                 return Redirect(failUrl);
