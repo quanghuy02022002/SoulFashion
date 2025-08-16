@@ -82,7 +82,7 @@ namespace Services.Implementations
             }
         }
 
-       public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
+    public async Task<bool> VerifyBankTransferAsync(int orderId, string transactionId, decimal amount, DateTime transferDate)
 {
     try
     {
@@ -129,9 +129,9 @@ namespace Services.Implementations
         }
 
         // Kiểm tra xem order đã được thanh toán chưa
-        if (order.Status == "Paid")
+        if (order.Status == "Confirmed")
         {
-            _logger.LogWarning("Order #{OrderId} is already paid", orderId);
+            _logger.LogWarning("Order #{OrderId} is already confirmed", orderId);
             return false;
         }
 
@@ -163,14 +163,13 @@ namespace Services.Implementations
         // Cập nhật trạng thái đơn hàng
         try 
         {
-            order.Status = "Paid";
+            order.Status = "Confirmed"; // Cập nhật thành "Confirmed"
             await _orderRepo.UpdateAsync(order);
-            _logger.LogInformation("Order #{OrderId} status updated to Paid", orderId);
+            _logger.LogInformation("Order #{OrderId} status updated to Confirmed", orderId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update order status for Order #{OrderId}", orderId);
-            // Có thể rollback bank transfer hoặc retry
             throw;
         }
 
