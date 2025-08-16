@@ -1,12 +1,14 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Repositories.Interfaces;
-using Services.Interfaces;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
+using Services.Interfaces;
 
 namespace Services.Implementations
 {
@@ -40,18 +42,19 @@ namespace Services.Implementations
             var order = await _orderRepo.GetByIdAsync(orderId) ?? throw new Exception($"Order #{orderId} not found");
             if (order.TotalPrice is null) throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-            var amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
+            long amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
 
+            // Payload PayOS
             var payload = new Dictionary<string, object>
             {
-                ["orderCode"] = orderCode, // số nguyên ≤ 9007199254740991
+                ["orderCode"] = orderCode,
                 ["amount"] = amountVnd,
                 ["description"] = description ?? $"Thanh toán đơn hàng #{orderId}",
                 ["returnUrl"] = _returnUrl,
                 ["cancelUrl"] = _cancelUrl
             };
 
-            // Signature alphabetically
+            // Signature: alphabetically by key
             var sorted = payload.OrderBy(k => k.Key).Select(k => $"{k.Key}={k.Value}");
             var dataString = string.Join("&", sorted);
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
@@ -78,6 +81,7 @@ namespace Services.Implementations
                 throw new Exception($"PayOS request failed: {ex.Message}");
             }
 
+            // Parse response
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
             string checkoutUrl = TryGet(root, "data.checkoutUrl") ?? throw new Exception($"checkoutUrl not found: {raw}");
