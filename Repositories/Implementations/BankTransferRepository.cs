@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Repositories.Interfaces;
 using Repositories.Models;
 using System;
@@ -40,11 +40,23 @@ namespace Repositories.Implementations
 
         public async Task<BankTransfer> UpdateAsync(BankTransfer bankTransfer)
         {
-            bankTransfer.UpdatedAt = DateTime.UtcNow;
-            _context.BankTransfers.Update(bankTransfer);
+            var existing = await _context.BankTransfers.FindAsync(bankTransfer.Id);
+            if (existing == null)
+                throw new Exception("BankTransfer not found");
+
+            existing.TransactionId = bankTransfer.TransactionId;
+            existing.Amount = bankTransfer.Amount;
+            existing.Status = bankTransfer.Status;
+            existing.TransferDate = bankTransfer.TransferDate;
+            existing.Note = bankTransfer.Note; // ✅ nhớ gán Note
+            existing.VerifiedBy = bankTransfer.VerifiedBy;
+            existing.VerifiedAt = bankTransfer.VerifiedAt;
+            existing.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
-            return bankTransfer;
+            return existing;
         }
+
 
         public async Task<IEnumerable<BankTransfer>> GetPendingTransfersAsync()
         {

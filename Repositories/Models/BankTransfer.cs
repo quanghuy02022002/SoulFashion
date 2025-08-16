@@ -13,7 +13,7 @@ namespace Repositories.Models
         public string TransactionId { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public DateTime TransferDate { get; set; }
-        public string Status { get; set; } = "Pending"; // Pending, Completed, Failed
+        public string Status { get; set; } = "Pending"; // Pending, Completed, Faileda
         public string? Note { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
