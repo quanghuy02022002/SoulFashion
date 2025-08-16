@@ -25,7 +25,14 @@ namespace Services.Implementations
             _http = httpClientFactory.CreateClient();
             _orderRepo = orderRepo;
 
-            // Cấu hình HTTP client
+            // Cấu hình HTTP client với SSL
+            _http.Timeout = TimeSpan.FromSeconds(30);
+            _http.DefaultRequestHeaders.Add("User-Agent", "SoulFashion-PayOS-Integration/1.0");
+            
+            // Thêm SSL configuration
+            var handler = new HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+            _http = new HttpClient(handler);
             _http.Timeout = TimeSpan.FromSeconds(30);
             _http.DefaultRequestHeaders.Add("User-Agent", "SoulFashion-PayOS-Integration/1.0");
 
@@ -58,6 +65,18 @@ namespace Services.Implementations
 
                 Console.WriteLine($"PayOS: Creating payment link for Order #{orderId}, Amount: {order.TotalPrice.Value}");
 
+                // ✅ Test kết nối trước
+                try
+                {
+                    Console.WriteLine("PayOS: Testing connection to PayOS...");
+                    var testResponse = await _http.GetAsync("https://api-merchant.payos.vn");
+                    Console.WriteLine($"PayOS: Test connection status: {testResponse.StatusCode}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"PayOS: Test connection failed: {ex.Message}");
+                }
+
                 // ✅ Thử các URL khác nhau của PayOS
                 var urls = new[]
                 {
@@ -68,12 +87,22 @@ namespace Services.Implementations
                     "https://api-merchant.payos.vn/v2/payment/create", // URL có thể đúng
                     "https://api.payos.vn/v2/payment/create", // URL có thể đúng
                     "https://api-merchant.payos.vn/v2/payment-request", // URL khác
-                    "https://api.payos.vn/v2/payment-request" // URL khác
+                    "https://api.payos.vn/v2/payment-request", // URL khác
+                    "https://api-merchant.payos.vn/v2/payment-requests/create", // URL khác
+                    "https://api.payos.vn/v2/payment-requests/create", // URL khác
+                    "https://api-merchant.payos.vn/v2/payment/create-payment", // URL khác
+                    "https://api.payos.vn/v2/payment/create-payment" // URL khác
                 };
 
                 // ✅ Thử các format payload khác nhau
                 var payloads = new object[]
                 {
+                    // Format 0: Đơn giản nhất - chỉ có orderCode và amount
+                    new
+                    {
+                        orderCode = order.OrderId.ToString(),
+                        amount = order.TotalPrice.Value
+                    },
                     // Format 1: Không có signature (chỉ dùng headers)
                     new
                     {
@@ -215,6 +244,7 @@ namespace Services.Implementations
                         catch (HttpRequestException ex)
                         {
                             Console.WriteLine($"PayOS: HTTP request error with URL {url} and format {i + 1}: {ex.Message}");
+                            Console.WriteLine($"PayOS: Inner exception: {ex.InnerException?.Message}");
                             continue;
                         }
                         catch (TaskCanceledException ex)
@@ -225,11 +255,18 @@ namespace Services.Implementations
                         catch (Exception ex)
                         {
                             Console.WriteLine($"PayOS: Error with URL {url} and payload format {i + 1}: {ex.Message}");
+                            Console.WriteLine($"PayOS: Stack trace: {ex.StackTrace}");
                             continue;
                         }
                     }
                 }
 
+                Console.WriteLine("PayOS: All URLs and payload formats failed. Summary:");
+                Console.WriteLine($"  - Tried {urls.Length} different URLs");
+                Console.WriteLine($"  - Tried {payloads.Length} different payload formats");
+                Console.WriteLine($"  - Total attempts: {urls.Length * payloads.Length}");
+                Console.WriteLine("  - Check console logs above for detailed error information");
+                
                 throw new Exception("All URLs and payload formats failed. Check console logs for details.");
             }
             catch (Exception ex)

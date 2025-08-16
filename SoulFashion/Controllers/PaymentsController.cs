@@ -268,5 +268,23 @@ namespace SoulFashion.Controllers
                 return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
             }
         }
+
+        // Cancel URL
+        [HttpGet("payos-cancel")]
+        [AllowAnonymous]
+        public async Task<IActionResult> PayOsCancel([FromQuery] int orderId, [FromQuery] string status)
+        {
+            try
+            {
+                Console.WriteLine($"PayOS Cancel: Order #{orderId}, Status: {status}");
+                Console.WriteLine($"PayOS Cancel: Payment cancelled by user, redirecting to failed page");
+                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"PayOS Cancel Error for Order #{orderId}: {ex.Message}");
+                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+            }
+        }
     }
 }
