@@ -188,20 +188,14 @@ namespace Services.Implementations
 
         private string GenerateVietcombankQrCode(int orderId, decimal amount)
         {
-            // Tạo QR code theo chuẩn Vietcombank
-            var qrData = new
-            {
-                bankBin = "970436", // Vietcombank BIN
-                accountNo = _accountNumber,
-                amount = amount.ToString("F0"),
-                format = "text",
-                template = "compact2"
-            };
-
-            // Trong thực tế, bạn sẽ sử dụng thư viện QR code để tạo
-            // Ở đây chỉ trả về URL placeholder
-            var jsonData = JsonSerializer.Serialize(qrData);
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={Uri.EscapeDataString(jsonData)}";
+            // Tạo QR code đơn giản với thông tin chuyển khoản
+            var transferContent = $"{_transferContent}{orderId}";
+            
+            // Tạo dữ liệu QR đơn giản
+            var qrData = $"Ngân hàng: {_bankName}\nSố TK: {_accountNumber}\nTên TK: {_accountName}\nSố tiền: {amount:N0} VND\nNội dung: {transferContent}";
+            
+            // Tạo URL QR code
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={Uri.EscapeDataString(qrData)}&format=png&margin=10&ecc=M";
         }
     }
 }
