@@ -1,12 +1,12 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Repositories.Interfaces;
-using Repositories.Models;
 using Services.Interfaces;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Services.Implementations
 {
@@ -22,10 +22,7 @@ namespace Services.Implementations
         private readonly string _returnUrl;
         private readonly string _cancelUrl;
 
-        public PayOsService(
-            IConfiguration config,
-            System.Net.Http.IHttpClientFactory httpClientFactory,
-            IOrderRepository orderRepo)
+        public PayOsService(IConfiguration config, IHttpClientFactory httpClientFactory, IOrderRepository orderRepo)
         {
             _http = httpClientFactory.CreateClient();
             _orderRepo = orderRepo;
@@ -38,48 +35,35 @@ namespace Services.Implementations
             _cancelUrl = config["PayOS:CancelUrl"] ?? "";
         }
 
-        /// <summary>
-        /// Tạo link thanh toán PayOS
-        /// </summary>
         public async Task<(string checkoutUrl, string? qrCode, string rawResponse)> CreatePaymentLinkAsync(int orderId, string orderCode, string? description = null)
         {
-            var order = await _orderRepo.GetByIdAsync(orderId)
-                        ?? throw new Exception($"Order #{orderId} not found");
-
-            if (order.TotalPrice is null)
-                throw new Exception($"Order #{orderId} chưa có TotalPrice");
+            var order = await _orderRepo.GetByIdAsync(orderId) ?? throw new Exception($"Order #{orderId} not found");
+            if (order.TotalPrice is null) throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
             var amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
 
-            // 1) Build payload
             var payload = new Dictionary<string, object>
             {
-                ["orderCode"] = orderCode,
+                ["orderCode"] = orderCode, // số nguyên ≤ 9007199254740991
                 ["amount"] = amountVnd,
                 ["description"] = description ?? $"Thanh toán đơn hàng #{orderId}",
                 ["returnUrl"] = _returnUrl,
                 ["cancelUrl"] = _cancelUrl
             };
 
-            // 2) Tạo signature chuẩn PayOS (sort key alphabet)
+            // Signature alphabetically
             var sorted = payload.OrderBy(k => k.Key).Select(k => $"{k.Key}={k.Value}");
             var dataString = string.Join("&", sorted);
-
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataString));
-            var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            payload["signature"] = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
 
-            payload["signature"] = signature;
-
-            // 3) Gửi request
+            // Send request
             HttpResponseMessage res;
             string raw;
             try
             {
-                var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
-                {
-                    Content = JsonContent.Create(payload)
-                };
+                var req = new HttpRequestMessage(HttpMethod.Post, _createUrl) { Content = JsonContent.Create(payload) };
                 req.Headers.Add("x-client-id", _clientId);
                 req.Headers.Add("x-api-key", _apiKey);
 
@@ -94,15 +78,10 @@ namespace Services.Implementations
                 throw new Exception($"PayOS request failed: {ex.Message}");
             }
 
-            // 4) Parse response
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
-
-            string checkoutUrl = TryGet(root, "data.checkoutUrl")
-                                 ?? TryGet(root, "checkoutUrl")
-                                 ?? throw new Exception($"checkoutUrl not found in PayOS response: {raw}");
-
-            string? qrCode = TryGet(root, "data.qrCode") ?? TryGet(root, "qrCode");
+            string checkoutUrl = TryGet(root, "data.checkoutUrl") ?? throw new Exception($"checkoutUrl not found: {raw}");
+            string? qrCode = TryGet(root, "data.qrCode");
 
             return (checkoutUrl, qrCode, raw);
 
@@ -110,25 +89,18 @@ namespace Services.Implementations
             {
                 var cur = el;
                 foreach (var seg in path.Split('.'))
-                {
                     if (cur.ValueKind != JsonValueKind.Object || !cur.TryGetProperty(seg, out cur))
                         return null;
-                }
                 return cur.ValueKind == JsonValueKind.String ? cur.GetString() : cur.ToString();
             }
         }
 
-        /// <summary>
-        /// Xác thực webhook PayOS
-        /// </summary>
         public bool VerifyWebhook(string rawBody, string signatureHeader)
         {
             if (string.IsNullOrWhiteSpace(signatureHeader)) return false;
-
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
             var computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-
             return string.Equals(computed, signatureHeader.Trim().ToLowerInvariant(), StringComparison.Ordinal);
         }
     }

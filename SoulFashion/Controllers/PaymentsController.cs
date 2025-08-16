@@ -150,26 +150,22 @@ namespace SoulFashion.Controllers
         {
             try
             {
-                var orderCode = "PAYOS" + dto.OrderId + DateTime.UtcNow.Ticks;
+                // orderCode số nguyên hợp lệ
+                long orderCodeNum = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + dto.OrderId;
+                string orderCode = orderCodeNum.ToString();
 
-                // Lưu payment pending
                 await _paymentService.CreatePaymentAsync(dto, orderCode);
 
-                // Tạo link PayOS
                 var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
 
-                return Ok(new
-                {
-                    paymentUrl = checkoutUrl,
-                    qrCode,
-                    raw = rawResponse
-                });
+                return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = ex.Message, stack = ex.StackTrace });
             }
         }
+
 
         // ====== PayOS webhook ======
         [HttpPost("payos-webhook")]
