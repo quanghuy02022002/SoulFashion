@@ -42,15 +42,15 @@ namespace Services.Implementations
             if (order.TotalPrice == null)
                 throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-            // ✅ Thử bỏ signature field - PayOS có thể không cần
+            // ✅ Thử format đúng theo PayOS API v2
             var payload = new
             {
                 orderCode = order.OrderId.ToString(),
                 amount = order.TotalPrice.Value,
                 description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
                 cancelUrl = _cancelUrl,
-                returnUrl = _returnUrl
-                // Bỏ signature field
+                returnUrl = _returnUrl,
+                signature = GenerateSignature(order.OrderId.ToString(), order.TotalPrice.Value)
             };
 
             var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
@@ -80,16 +80,16 @@ namespace Services.Implementations
 
         private string GenerateSignature(string orderCode, decimal amount)
         {
-            // ✅ Thử format 3: MD5 hash (phổ biến với payment gateway)
-            var data = $"{orderCode}{amount}{_checksumKey}";
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(data));
+            // ✅ Format đúng theo PayOS: orderCode + amount (không có checksumKey trong data)
+            var data = $"{orderCode}{amount}";
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
             
             // ✅ Log để debug
             Console.WriteLine($"Debug - Data: {data}");
             Console.WriteLine($"Debug - ChecksumKey: {_checksumKey}");
-            Console.WriteLine($"Debug - Signature (MD5): {signature}");
+            Console.WriteLine($"Debug - Signature (HMAC-SHA256): {signature}");
             
             return signature;
         }
