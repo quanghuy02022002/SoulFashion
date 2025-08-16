@@ -46,8 +46,8 @@ namespace Services.Implementations
 
             var amountVnd = (long)decimal.Round(order.TotalPrice.Value, 0, MidpointRounding.AwayFromZero);
 
-            // --- Tạo orderCode hợp lệ ---
-            long orderCodeNum = (orderId + DateTime.UtcNow.Ticks) % MAX_ORDER_CODE;
+            // --- Tạo orderCode hợp lệ (số nhỏ, không vượt MAX_ORDER_CODE) ---
+            long orderCodeNum = orderId; // dùng trực tiếp orderId
             string orderCode = orderCodeNum.ToString();
 
             var payload = new
@@ -75,11 +75,14 @@ namespace Services.Implementations
             using var doc = JsonDocument.Parse(raw);
             var root = doc.RootElement;
 
-            string? checkoutUrl = root.GetProperty("data").TryGetProperty("checkoutUrl", out var urlEl) ? urlEl.GetString() : null;
-            string? qrCode = root.GetProperty("data").TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
+            if (!root.TryGetProperty("data", out var dataEl) || dataEl.ValueKind != JsonValueKind.Object)
+                throw new Exception($"PayOS response missing 'data': {raw}");
+
+            string? checkoutUrl = dataEl.TryGetProperty("checkoutUrl", out var urlEl) ? urlEl.GetString() : null;
+            string? qrCode = dataEl.TryGetProperty("qrCode", out var qrEl) ? qrEl.GetString() : null;
 
             if (string.IsNullOrEmpty(checkoutUrl))
-                throw new Exception($"checkoutUrl not found: {raw}");
+                throw new Exception($"checkoutUrl not found in PayOS response: {raw}");
 
             return (checkoutUrl!, qrCode, raw);
         }

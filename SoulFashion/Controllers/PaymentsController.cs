@@ -15,7 +15,7 @@ namespace SoulFashion.Controllers
         private readonly IPaymentService _paymentService;
         private readonly IVnPayService _vnPayService;
         private readonly IMomoService _momoService;
-        private readonly IPayOsService _payOsService; // ✅ thêm
+        private readonly IPayOsService _payOsService;
         private readonly IConfiguration _config;
 
         public PaymentsController(
@@ -56,110 +56,28 @@ namespace SoulFashion.Controllers
             return Ok(new { paymentUrl = payUrl });
         }
 
-        // ====== VNPay CALLBACK (GET) — VNPay redirect về bằng GET ======
-        [HttpGet("vnpay-callback")]
-        [AllowAnonymous]
-        public async Task<IActionResult> VnPayCallback()
-        {
-            var isValid = _vnPayService.ValidateResponse(Request.Query, out var txnRef);
-            var code = Request.Query["vnp_ResponseCode"].ToString();
-            var status = Request.Query["vnp_TransactionStatus"].ToString();
-
-            if (isValid && code == "00" && status == "00")
-            {
-                await _paymentService.MarkAsPaid(txnRef);
-
-                var payment = await _paymentService.GetByTxnRefAsync(txnRef); // lấy orderId
-                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?txnRef={txnRef}&orderId={payment.OrderId}");
-            }
-
-            return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
-        }
-
-
-
-        // (tuỳ VNPay/hoặc muốn bắt notify dạng POST)
-        [HttpPost("vnpay-callback")]
-        [AllowAnonymous]
-        public Task<IActionResult> VnPayCallbackPost() => VnPayCallback();
-
-        [HttpPost("vnpay-callback-test")]
-        public async Task<IActionResult> TestCallback([FromBody] string txnRef)
-        {
-            if (string.IsNullOrWhiteSpace(txnRef))
-                return BadRequest(new { success = false, message = "Thiếu transactionRef" });
-
-            await _paymentService.MarkAsPaid(txnRef);
-
-            return Ok(new
-            {
-                success = true,
-                message = "Thanh toán test thành công",
-                transactionRef = txnRef
-            });
-        }
-
-        [HttpPost("momo-notify")]
-        public async Task<IActionResult> MomoNotify([FromBody] JsonElement body)
-        {
-            try
-            {
-                var orderId = body.GetProperty("orderId").GetString();
-                var resultCode = body.GetProperty("resultCode").GetInt32();
-
-                if (resultCode == 0 && !string.IsNullOrEmpty(orderId))
-                {
-                    await _paymentService.MarkAsPaid(orderId);
-                    return Ok(new { message = "OK", status = "paid", transactionRef = orderId });
-                }
-
-                return BadRequest(new { message = "FAILED", status = "error" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Notify error", error = ex.Message });
-            }
-        }
-
-        [HttpGet("momo-return")]
-        public IActionResult MomoReturn([FromQuery] string orderId, [FromQuery] int resultCode)
-        {
-            if (resultCode == 0)
-                return Ok(new { success = true, message = "Thanh toán thành công", transactionRef = orderId });
-
-            return BadRequest(new { success = false, message = "Thanh toán thất bại hoặc bị hủy" });
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            await _paymentService.DeleteAsync(id);
-            return NoContent();
-        }
-
-        [HttpPut]
-        public async Task<IActionResult> Update([FromBody] PaymentDto dto)
-        {
-            await _paymentService.UpdateAsync(dto);
-            return Ok(new { message = "Cập nhật thành công" });
-        }
-
-        // ====== Tạo link PayOS ======
         [HttpPost("payos")]
         public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
         {
             try
             {
+                // Lưu payment pending trước
                 await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
+
+                // Tạo link PayOS dựa trên orderId (không tạo orderCode khác)
                 var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
 
-                return Ok(new { paymentUrl = checkoutUrl, qrCode, raw = rawResponse });
+                return Ok(new
+                {
+                    paymentUrl = checkoutUrl,
+                    qrCode,
+                    raw = rawResponse
+                });
             }
             catch (Exception ex)
             {
-                // log vào console hoặc ILogger
                 Console.WriteLine("PayOS create error: " + ex);
-                return StatusCode(500, new { message = "Internal Server Error", error = ex.Message });
+                return StatusCode(500, new { message = "PayOS create error", error = ex.Message });
             }
         }
 
@@ -175,9 +93,11 @@ namespace SoulFashion.Controllers
                 return Unauthorized(new { message = "Invalid signature" });
 
             using var doc = JsonDocument.Parse(body);
-            var data = doc.RootElement.GetProperty("data");
-            var status = data.GetProperty("status").GetString();
-            var orderCode = data.GetProperty("orderCode").GetString();
+            if (!doc.RootElement.TryGetProperty("data", out var dataEl) || dataEl.ValueKind != JsonValueKind.Object)
+                return BadRequest(new { message = "Invalid data in webhook" });
+
+            var status = dataEl.GetProperty("status").GetString();
+            var orderCode = dataEl.GetProperty("orderCode").GetString();
 
             if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(orderCode))
             {
@@ -186,9 +106,8 @@ namespace SoulFashion.Controllers
 
             return Ok(new { message = "OK" });
         }
-    
 
-    [HttpGet("payos-return")]
+        [HttpGet("payos-return")]
         [AllowAnonymous]
         public async Task<IActionResult> PayOsReturn([FromQuery] string orderCode, [FromQuery] string status)
         {
@@ -200,5 +119,19 @@ namespace SoulFashion.Controllers
             }
             return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _paymentService.DeleteAsync(id);
+            return NoContent();
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> Update([FromBody] PaymentDto dto)
+        {
+            await _paymentService.UpdateAsync(dto);
+            return Ok(new { message = "Cập nhật thành công" });
+        }
     }
-    }
+}
