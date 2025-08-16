@@ -5,8 +5,9 @@ using Repositories.DTOs;
 using Services.Interfaces;
 using System.Text.Json;
 using System.Text;
-using Microsoft.Extensions.Logging; // Added for logging
-using Microsoft.Extensions.DependencyInjection; // Added for GetRequiredService
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Services.Interfaces;
 
 namespace SoulFashion.Controllers
 {
@@ -17,20 +18,20 @@ namespace SoulFashion.Controllers
         private readonly IPaymentService _paymentService;
         private readonly IVnPayService _vnPayService;
         private readonly IMomoService _momoService;
-        private readonly IPayOsService _payOsService; // ✅ thêm
+        private readonly IBankTransferService _bankTransferService;
         private readonly ILogger<PaymentsController> _logger; // Added for logging
 
         public PaymentsController(
             IPaymentService paymentService,
             IVnPayService vnPayService,
             IMomoService momoService,
-            IPayOsService payOsService,
+            IBankTransferService bankTransferService,
             ILogger<PaymentsController> logger) // Added logger to constructor
         {
             _paymentService = paymentService;
             _vnPayService = vnPayService;
             _momoService = momoService;
-            _payOsService = payOsService;
+            _bankTransferService = bankTransferService;
             _logger = logger; // Initialize logger
         }
 
@@ -145,146 +146,117 @@ namespace SoulFashion.Controllers
             await _paymentService.UpdateAsync(dto);
             return Ok(new { message = "Cập nhật thành công" });
         }
-        // Tạo link thanh toán PayOS
-        [HttpPost("payos")]
-        public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
+        // Bank Transfer endpoints
+        [HttpGet("bank-transfer/{orderId}")]
+        public async Task<IActionResult> GetBankTransferInfo(int orderId)
         {
             try
             {
-                _logger.LogInformation("Creating PayOS payment link for Order #{OrderId}", dto.OrderId);
-
-                // Tạm thời sử dụng VnPay thay vì PayOS để test
-                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-                var txnRef = $"ORDER_{dto.OrderId}_{DateTime.UtcNow:yyyyMMddHHmmss}";
-                
-                var vnPayService = HttpContext.RequestServices.GetRequiredService<IVnPayService>();
-                var paymentUrl = vnPayService.CreatePaymentUrl(dto, ipAddress, txnRef);
-
-                _logger.LogInformation("VnPay payment URL created successfully for Order #{OrderId}", dto.OrderId);
-
+                _logger.LogInformation("Getting bank transfer info for Order #{OrderId}", orderId);
+                var bankTransferInfo = await _bankTransferService.GetBankTransferInfoAsync(orderId);
                 return Ok(new
                 {
                     success = true,
-                    message = "Payment link created successfully (using VnPay)",
-                    orderId = dto.OrderId,
-                    paymentUrl = paymentUrl,
-                    qrCode = (string?)null
+                    data = bankTransferInfo
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to create VnPay payment link for Order #{OrderId}", dto.OrderId);
+                _logger.LogError(ex, "Failed to get bank transfer info for Order #{OrderId}", orderId);
                 return BadRequest(new
                 {
                     success = false,
-                    message = "Failed to create payment link",
-                    error = ex.Message,
-                    orderId = dto.OrderId
+                    message = ex.Message
                 });
             }
         }
 
-        // Webhook PayOS
-        [HttpPost("payos-webhook")]
-        [AllowAnonymous]
-        public async Task<IActionResult> PayOsWebhook()
+        [HttpPost("bank-transfer/verify")]
+        public async Task<IActionResult> VerifyBankTransfer([FromBody] BankTransferVerificationDto dto)
         {
             try
             {
-                using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-                var body = await reader.ReadToEndAsync();
-                var signature = Request.Headers["x-signature"].ToString();
+                _logger.LogInformation("Verifying bank transfer for Order #{OrderId}", dto.OrderId);
+                var isVerified = await _bankTransferService.VerifyBankTransferAsync(
+                    dto.OrderId, 
+                    dto.TransactionId, 
+                    dto.Amount, 
+                    dto.TransferDate);
 
-                Console.WriteLine($"PayOS Webhook: Received webhook from PayOS");
-                Console.WriteLine($"PayOS Webhook: Body length: {body?.Length ?? 0}");
-                Console.WriteLine($"PayOS Webhook: Signature header: {signature}");
-
-                if (!_payOsService.VerifyWebhook(body, signature))
+                if (isVerified)
                 {
-                    Console.WriteLine("PayOS Webhook: Invalid signature, rejecting webhook");
-                    return Unauthorized(new { 
-                        success = false,
-                        message = "Invalid signature",
-                        timestamp = DateTime.UtcNow
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Bank transfer verified successfully"
                     });
                 }
-
-                using var doc = JsonDocument.Parse(body);
-                var data = doc.RootElement.GetProperty("data");
-                var status = data.GetProperty("status").GetString();
-                var orderId = data.GetProperty("orderId").GetInt32();
-
-                Console.WriteLine($"PayOS Webhook: Valid webhook for Order #{orderId}, Status: {status}");
-
-                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    await _paymentService.MarkAsPaid(orderId.ToString());
-                    Console.WriteLine($"PayOS Webhook: Order #{orderId} marked as paid successfully");
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Bank transfer verification failed"
+                    });
                 }
-
-                return Ok(new { 
-                    success = true,
-                    message = "Webhook processed successfully",
-                    orderId,
-                    status,
-                    timestamp = DateTime.UtcNow
-                });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS Webhook Error: {ex.Message}");
-                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-                
-                return StatusCode(500, new { 
+                _logger.LogError(ex, "Failed to verify bank transfer for Order #{OrderId}", dto.OrderId);
+                return BadRequest(new
+                {
                     success = false,
-                    message = "Webhook processing failed",
-                    error = ex.Message,
-                    timestamp = DateTime.UtcNow
+                    message = ex.Message
                 });
             }
         }
 
-        // Return URL
-        [HttpGet("payos-return")]
-        [AllowAnonymous]
-        public async Task<IActionResult> PayOsReturn([FromQuery] int orderId, [FromQuery] string status)
+        [HttpGet("bank-transfer/status/{orderId}")]
+        public async Task<IActionResult> GetBankTransferStatus(int orderId)
         {
             try
             {
-                Console.WriteLine($"PayOS Return: Order #{orderId}, Status: {status}");
-
-                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                _logger.LogInformation("Getting bank transfer status for Order #{OrderId}", orderId);
+                var status = await _bankTransferService.GetTransferStatusAsync(orderId);
+                return Ok(new
                 {
-                    await _paymentService.MarkAsPaid(orderId.ToString());
-                    Console.WriteLine($"PayOS Return: Order #{orderId} marked as paid, redirecting to success page");
-                    return Redirect($"https://soul-of-fashion.vercel.app/payment-success?orderId={orderId}");
-                }
-
-                Console.WriteLine($"PayOS Return: Order #{orderId} not paid, redirecting to failed page");
-                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+                    success = true,
+                    data = status
+                });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS Return Error for Order #{orderId}: {ex.Message}");
-                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+                _logger.LogError(ex, "Failed to get bank transfer status for Order #{OrderId}", orderId);
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
 
-        // Cancel URL
-        [HttpGet("payos-cancel")]
-        [AllowAnonymous]
-        public async Task<IActionResult> PayOsCancel([FromQuery] int orderId, [FromQuery] string status)
+        [HttpGet("bank-transfer/pending")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetPendingTransfers()
         {
             try
             {
-                Console.WriteLine($"PayOS Cancel: Order #{orderId}, Status: {status}");
-                Console.WriteLine($"PayOS Cancel: Payment cancelled by user, redirecting to failed page");
-                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+                _logger.LogInformation("Getting pending bank transfers");
+                // This would need to be implemented in the service
+                return Ok(new
+                {
+                    success = true,
+                    message = "Pending transfers endpoint - to be implemented"
+                });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS Cancel Error for Order #{orderId}: {ex.Message}");
-                return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+                _logger.LogError(ex, "Failed to get pending bank transfers");
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
     }

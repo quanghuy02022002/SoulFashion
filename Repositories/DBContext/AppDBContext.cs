@@ -37,6 +37,7 @@ public partial class AppDBContext : DbContext
     public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
     public DbSet<ReturnInspection> ReturnInspections { get; set; }
     public DbSet<UserVerification> UserVerifications { get; set; }
+    public DbSet<BankTransfer> BankTransfers { get; set; }
     public static string GetConnectionString(string connectionStringName)
     {
         var config = new ConfigurationBuilder()
@@ -279,6 +280,32 @@ public partial class AppDBContext : DbContext
             .WithOne(v => v.User)
             .HasForeignKey<UserVerification>(v => v.UserId)
             .OnDelete(DeleteBehavior.Cascade); // hoặc .Restrict tuỳ yêu cầu
+
+        modelBuilder.Entity<BankTransfer>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__BankTransfers__Id");
+
+            entity.Property(e => e.TransactionId)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(e => e.Note).HasMaxLength(500);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+            entity.Property(e => e.VerifiedBy).HasMaxLength(100);
+            entity.Property(e => e.VerifiedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Order).WithMany()
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__BankTransfers__OrderId");
+        });
+
         OnModelCreatingPartial(modelBuilder);
     }
 

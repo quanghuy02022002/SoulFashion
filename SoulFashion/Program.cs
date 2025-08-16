@@ -90,6 +90,7 @@ builder.Services.AddScoped<IDepositRepository, DepositRepository>();
 builder.Services.AddScoped<IOrderStatusHistoryRepository, OrderStatusHistoryRepository>();
 builder.Services.AddScoped<ICollaboratorEearningRepository, CollaboratorEarningRepository>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IBankTransferRepository, BankTransferRepository>();
 
 // ---- DI Services ----
 builder.Services.AddScoped<IAccountService, AccountService>();
@@ -109,10 +110,7 @@ builder.Services.AddScoped<IOrderStatusHistoryService, OrderStatusHistoryService
 builder.Services.AddScoped<IEarningService, EarningService>();
 builder.Services.AddScoped<ICollaboratorEarningCrudService, CollaboratorEarningCrudService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
-
-// PayOS
-builder.Services.AddHttpClient();
-builder.Services.AddScoped<IPayOsService, PayOsService>();
+builder.Services.AddScoped<IBankTransferService, BankTransferService>();
 // ---- CORS ----
 builder.Services.AddCors(options =>
 {
