@@ -80,8 +80,8 @@ namespace Services.Implementations
 
         private string GenerateSignature(string orderCode, decimal amount)
         {
-            // ✅ Thử format 1: orderCode + amount (không có checksumKey trong data string)
-            var data = $"{orderCode}{amount}";
+            // ✅ Thử format 2: checksumKey + orderCode + amount
+            var data = $"{_checksumKey}{orderCode}{amount}";
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
