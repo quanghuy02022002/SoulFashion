@@ -16,17 +16,20 @@ namespace SoulFashion.Controllers
         private readonly IVnPayService _vnPayService;
         private readonly IMomoService _momoService;
         private readonly IPayOsService _payOsService; // ✅ thêm
+        private readonly IConfiguration _config;
 
         public PaymentsController(
             IPaymentService paymentService,
             IVnPayService vnPayService,
             IMomoService momoService,
-            IPayOsService payOsService)
+            IPayOsService payOsService,
+            IConfiguration config)
         {
             _paymentService = paymentService;
             _vnPayService = vnPayService;
             _momoService = momoService;
             _payOsService = payOsService;
+            _config = config;
         }
 
         [HttpGet("order/{orderId}")]
@@ -140,71 +143,98 @@ namespace SoulFashion.Controllers
             await _paymentService.UpdateAsync(dto);
             return Ok(new { message = "Cập nhật thành công" });
         }
-        // ====== PayOS: tạo link ======
+        // ====== Tạo link PayOS ======
         [HttpPost("payos")]
         public async Task<IActionResult> CreatePayOsLink([FromBody] PaymentDto dto)
         {
-            // tạo orderCode duy nhất (giống style của bạn ở VNPay/Momo)
-            var orderCode = "PAYOS" + dto.OrderId + DateTime.UtcNow.Ticks;
-
-            // Lưu 1 record payment "pending" trước, để khi webhook về có txnRef đối chiếu
-            await _paymentService.CreatePaymentAsync(dto, orderCode);
-
-            // Tạo link PayOS (service sẽ tự lấy amount từ Order.TotalPrice)
-            var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
-
-            return Ok(new
+            try
             {
-                paymentUrl = checkoutUrl,
-                qrCode,
-                raw = rawResponse
-            });
+                var orderCode = "PAYOS" + dto.OrderId + DateTime.UtcNow.Ticks;
+
+                // Lưu payment pending
+                await _paymentService.CreatePaymentAsync(dto, orderCode);
+
+                // Tạo link
+                var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId, orderCode);
+
+                return Ok(new
+                {
+                    paymentUrl = checkoutUrl,
+                    qrCode,
+                    raw = rawResponse
+                });
+            }
+            catch (Exception ex)
+            {
+                // log error
+                return StatusCode(500, new { message = ex.Message, stack = ex.StackTrace });
+            }
         }
 
-        // ====== PayOS: webhook (POST) — PayOS sẽ gọi nhiều lần nếu bạn không trả 200 OK
+        // ====== PayOS webhook ======
         [HttpPost("payos-webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> PayOsWebhook()
         {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var body = await reader.ReadToEndAsync();
-            var signature = Request.Headers["x-signature"].ToString();
-
-            // 1) Verify chữ ký
-            if (!_payOsService.VerifyWebhook(body, signature))
-                return Unauthorized(new { message = "Invalid signature" });
-
-            // 2) Parse JSON
-            using var doc = JsonDocument.Parse(body);
-            var data = doc.RootElement.GetProperty("data");
-            var status = data.GetProperty("status").GetString();
-            var orderCode = data.GetProperty("orderCode").GetString();
-
-            // 3) Idempotent: chỉ set PAID khi status == "PAID"
-            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(orderCode))
+            try
             {
-                await _paymentService.MarkAsPaid(orderCode);
-            }
+                using var reader = new StreamReader(Request.Body, Encoding.UTF8);
+                var body = await reader.ReadToEndAsync();
+                var signature = Request.Headers["x-signature"].ToString();
 
-            // 4) Trả 200 OK để PayOS dừng retry
-            return Ok(new { message = "OK" });
+                if (!_payOsService.VerifyWebhook(body, signature))
+                    return Unauthorized(new { message = "Invalid signature" });
+
+                using var doc = JsonDocument.Parse(body);
+                var data = doc.RootElement.GetProperty("data");
+                var status = data.GetProperty("status").GetString();
+                var orderCode = data.GetProperty("orderCode").GetString();
+
+                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(orderCode))
+                {
+                    await _paymentService.MarkAsPaid(orderCode);
+                }
+
+                return Ok(new { message = "OK" });
+            }
+            catch (Exception ex)
+            {
+                // log error
+                return StatusCode(500, new { message = "Webhook error", error = ex.Message });
+            }
         }
 
-        // (Tuỳ chọn) Nếu muốn có GET return để redirect về FE kèm tham số
+        // ====== PayOS return redirect ======
         [HttpGet("payos-return")]
         [AllowAnonymous]
         public async Task<IActionResult> PayOsReturn([FromQuery] string orderCode, [FromQuery] string status)
         {
-            if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                // đảm bảo idempotent (MarkAsPaid của bạn đã kiểm tra)
-                await _paymentService.MarkAsPaid(orderCode);
-                var payment = await _paymentService.GetByTxnRefAsync(orderCode);
-                return Redirect($"https://soul-of-fashion.vercel.app/payment-success?txnRef={orderCode}&orderId={payment.OrderId}");
+                if (string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _paymentService.MarkAsPaid(orderCode);
+                    var payment = await _paymentService.GetByTxnRefAsync(orderCode);
+
+                    var feUrl = _config["FrontEnd:PaymentSuccessUrl"]
+                                ?? $"https://soul-of-fashion.vercel.app/payment-success";
+
+                    return Redirect($"{feUrl}?txnRef={orderCode}&orderId={payment.OrderId}");
+                }
+
+                var failUrl = _config["FrontEnd:PaymentFailedUrl"]
+                              ?? "https://soul-of-fashion.vercel.app/payment-failed";
+
+                return Redirect(failUrl);
             }
-            return Redirect("https://soul-of-fashion.vercel.app/payment-failed");
+            catch (Exception ex)
+            {
+                // nếu error redirect về trang fail
+                var failUrl = _config["FrontEnd:PaymentFailedUrl"]
+                              ?? "https://soul-of-fashion.vercel.app/payment-failed";
+                return Redirect(failUrl);
+            }
         }
-    
-}
+    }
 }
