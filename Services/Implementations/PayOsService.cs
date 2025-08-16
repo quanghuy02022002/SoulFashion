@@ -80,16 +80,16 @@ namespace Services.Implementations
 
         private string GenerateSignature(string orderCode, decimal amount)
         {
-            // ✅ Thử format 2: checksumKey + orderCode + amount
-            var data = $"{_checksumKey}{orderCode}{amount}";
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            // ✅ Thử format 3: MD5 hash (phổ biến với payment gateway)
+            var data = $"{orderCode}{amount}{_checksumKey}";
+            using var md5 = MD5.Create();
+            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(data));
             var signature = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
             
             // ✅ Log để debug
             Console.WriteLine($"Debug - Data: {data}");
             Console.WriteLine($"Debug - ChecksumKey: {_checksumKey}");
-            Console.WriteLine($"Debug - Signature: {signature}");
+            Console.WriteLine($"Debug - Signature (MD5): {signature}");
             
             return signature;
         }
