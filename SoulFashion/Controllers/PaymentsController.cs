@@ -236,7 +236,6 @@ namespace SoulFashion.Controllers
         }
 
         [HttpGet("bank-transfer/pending")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetPendingTransfers()
         {
             try
