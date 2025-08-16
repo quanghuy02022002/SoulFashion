@@ -5,6 +5,8 @@ using Repositories.DTOs;
 using Services.Interfaces;
 using System.Text.Json;
 using System.Text;
+using Microsoft.Extensions.Logging; // Added for logging
+using Microsoft.Extensions.DependencyInjection; // Added for GetRequiredService
 
 namespace SoulFashion.Controllers
 {
@@ -16,17 +18,20 @@ namespace SoulFashion.Controllers
         private readonly IVnPayService _vnPayService;
         private readonly IMomoService _momoService;
         private readonly IPayOsService _payOsService; // ✅ thêm
+        private readonly ILogger<PaymentsController> _logger; // Added for logging
 
         public PaymentsController(
             IPaymentService paymentService,
             IVnPayService vnPayService,
             IMomoService momoService,
-            IPayOsService payOsService)
+            IPayOsService payOsService,
+            ILogger<PaymentsController> logger) // Added logger to constructor
         {
             _paymentService = paymentService;
             _vnPayService = vnPayService;
             _momoService = momoService;
             _payOsService = payOsService;
+            _logger = logger; // Initialize logger
         }
 
         [HttpGet("order/{orderId}")]
@@ -146,39 +151,35 @@ namespace SoulFashion.Controllers
         {
             try
             {
-                // Validate input
-                if (dto == null || dto.OrderId <= 0)
-                    return BadRequest(new { message = "Invalid order information", orderId = dto?.OrderId });
+                _logger.LogInformation("Creating PayOS payment link for Order #{OrderId}", dto.OrderId);
 
-                Console.WriteLine($"PayOS: Creating payment link for Order #{dto.OrderId}");
+                // Tạm thời sử dụng VnPay thay vì PayOS để test
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+                var txnRef = $"ORDER_{dto.OrderId}_{DateTime.UtcNow:yyyyMMddHHmmss}";
+                
+                var vnPayService = HttpContext.RequestServices.GetRequiredService<IVnPayService>();
+                var paymentUrl = vnPayService.CreatePaymentUrl(dto, ipAddress, txnRef);
 
-                // Tạo payment record trước
-                await _paymentService.CreatePaymentAsync(dto, dto.OrderId.ToString());
+                _logger.LogInformation("VnPay payment URL created successfully for Order #{OrderId}", dto.OrderId);
 
-                // Tạo PayOS payment link
-                var (checkoutUrl, qrCode, rawResponse) = await _payOsService.CreatePaymentLinkAsync(dto.OrderId);
-
-                Console.WriteLine($"PayOS: Successfully created payment link for Order #{dto.OrderId}");
-
-                return Ok(new { 
+                return Ok(new
+                {
                     success = true,
-                    message = "Payment link created successfully",
-                    paymentUrl = checkoutUrl, 
-                    qrCode, 
+                    message = "Payment link created successfully (using VnPay)",
                     orderId = dto.OrderId,
-                    raw = rawResponse 
+                    paymentUrl = paymentUrl,
+                    qrCode = (string?)null
                 });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"PayOS CreatePayOsLink Error for Order #{dto?.OrderId}: {ex.Message}");
-                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-                
-                return StatusCode(500, new { 
+                _logger.LogError(ex, "Failed to create VnPay payment link for Order #{OrderId}", dto.OrderId);
+                return BadRequest(new
+                {
                     success = false,
-                    message = "Failed to create PayOS payment link", 
+                    message = "Failed to create payment link",
                     error = ex.Message,
-                    orderId = dto?.OrderId
+                    orderId = dto.OrderId
                 });
             }
         }
