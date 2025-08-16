@@ -18,6 +18,7 @@ namespace Services.Implementations
         private readonly string _createUrl;
         private readonly string _returnUrl;
         private readonly string _cancelUrl;
+        private readonly string _checksumKey;
 
         public PayOsService(IConfiguration config, IHttpClientFactory httpClientFactory, IOrderRepository orderRepo)
         {
@@ -26,6 +27,7 @@ namespace Services.Implementations
 
             _clientId = config["PayOS:ClientId"] ?? "";
             _apiKey = config["PayOS:ApiKey"] ?? "";
+            _checksumKey = config["PayOS:ChecksumKey"] ?? "";
             _createUrl = config["PayOS:CreateUrl"] ?? "";
             _returnUrl = config["PayOS:ReturnUrl"] ?? "";
             _cancelUrl = config["PayOS:CancelUrl"] ?? "";
@@ -40,14 +42,15 @@ namespace Services.Implementations
             if (order.TotalPrice == null)
                 throw new Exception($"Order #{orderId} chưa có TotalPrice");
 
-            // Payload theo API test PayOS
+            // ✅ Payload đúng format PayOS API
             var payload = new
             {
-                paymentId = 0,
-                orderId = order.OrderId,
-                paymentMethod = "payos",
-                paymentStatus = "pending",
-                paidAt = DateTime.UtcNow
+                orderCode = order.OrderId.ToString(),
+                amount = order.TotalPrice.Value,
+                description = $"Thanh toán đơn hàng #{order.OrderId} - SoulFashion",
+                cancelUrl = _cancelUrl,
+                returnUrl = _returnUrl,
+                signature = GenerateSignature(order.OrderId.ToString(), order.TotalPrice.Value)
             };
 
             var req = new HttpRequestMessage(HttpMethod.Post, _createUrl)
@@ -75,12 +78,20 @@ namespace Services.Implementations
             return (checkoutUrl, qrCode, raw);
         }
 
+        private string GenerateSignature(string orderCode, decimal amount)
+        {
+            var data = $"{orderCode}|{amount}|{_checksumKey}";
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+        }
+
         // Xác thực webhook từ PayOS
         public bool VerifyWebhook(string rawBody, string signatureHeader)
         {
             if (string.IsNullOrWhiteSpace(signatureHeader)) return false;
 
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_apiKey));
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_checksumKey)); // ✅ Sửa: dùng _checksumKey
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawBody));
             var computed = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
 
