@@ -194,16 +194,16 @@ namespace Services.Implementations
             // Tạo QR code theo chuẩn VietQR để app ngân hàng có thể quét trực tiếp
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Thử format đơn giản mà các app ngân hàng có thể hiểu
-            var qrData = $"Ngân hàng: Vietcombank\nSố tài khoản: {_accountNumber}\nTên tài khoản: {_accountName}\nSố tiền: {amount:N0} VND\nNội dung: {transferContent}";
+            // Tạo dữ liệu QR theo chuẩn EMV QR Code (VietQR) - format chuẩn nhất
+            var qrData = BuildVietQRData(amount, transferContent);
             
-            // Sử dụng QR Server với cấu hình tối ưu
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
+            // Sử dụng QR Server với cấu hình tối ưu cho ngân hàng
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=10&ecc=M&qzone=1";
         }
 
         private string BuildVietQRData(decimal amount, string transferContent)
         {
-            // Tạo VietQR theo chuẩn EMV QR Code cho Vietcombank
+            // Tạo VietQR theo chuẩn EMV QR Code cho Vietcombank - format chuẩn nhất
             var data = new List<string>();
             
             // Payload Format Indicator (Static QR)
@@ -249,20 +249,22 @@ namespace Services.Implementations
 
         private string CalculateCRC16(string data)
         {
+            // Sử dụng CRC16-CCITT (0xFFFF) - chuẩn cho EMV QR Code
             ushort crc = 0xFFFF;
+            ushort polynomial = 0x1021;
+            
             foreach (char c in data)
             {
-                crc ^= (ushort)c;
+                crc ^= (ushort)(c << 8);
                 for (int i = 0; i < 8; i++)
                 {
-                    if ((crc & 0x0001) != 0)
+                    if ((crc & 0x8000) != 0)
                     {
-                        crc >>= 1;
-                        crc ^= 0x8408;
+                        crc = (ushort)((crc << 1) ^ polynomial);
                     }
                     else
                     {
-                        crc >>= 1;
+                        crc <<= 1;
                     }
                 }
             }
