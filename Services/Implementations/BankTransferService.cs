@@ -188,34 +188,29 @@ namespace Services.Implementations
 
         private async Task<string> GenerateVietcombankQrCode(int orderId, decimal amount)
         {
-            // Tạo QR code đẹp như VietQR.net
+            // Tạo QR code theo chuẩn VietQR để app ngân hàng có thể quét trực tiếp
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Sử dụng API của VietQR.net để tạo QR code đẹp
-            var qrCodeUrl = $"https://vietqr.net/api/qr-code?" +
-                           $"bank=VCB" +
-                           $"&account={_accountNumber}" +
-                           $"&name={Uri.EscapeDataString(_accountName)}" +
-                           $"&amount={amount:N0}" +
-                           $"&content={Uri.EscapeDataString(transferContent)}" +
-                           $"&template=default" +
-                           $"&size=400";
+            // Tạo dữ liệu QR theo chuẩn EMV QR Code (VietQR)
+            var qrData = BuildVietQRData(amount, transferContent);
             
-            return qrCodeUrl;
+            // Tạo URL QR code với cấu hình tối ưu
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
         }
 
         private string BuildVietQRData(decimal amount, string transferContent)
         {
-            // Tạo VietQR theo chuẩn EMV QR Code
+            // Tạo VietQR theo chuẩn EMV QR Code cho Vietcombank
             var data = new List<string>();
             
-            // Payload Format Indicator
+            // Payload Format Indicator (Static QR)
             data.Add("000201");
             
-            // Point of Initiation Method (12 = Static QR)
+            // Point of Initiation Method (Static QR)
             data.Add("010212");
             
             // Merchant Account Information - Vietcombank
+            // A000000727012900 là mã BIN của Vietcombank
             var merchantInfo = "0016A000000727012900";
             merchantInfo += "0010" + _accountNumber.Length.ToString("D2") + _accountNumber;
             data.Add("26" + merchantInfo.Length.ToString("D2") + merchantInfo);
@@ -230,14 +225,14 @@ namespace Services.Implementations
             var amountStr = amount.ToString("F0");
             data.Add("54" + amountStr.Length.ToString("D2") + amountStr);
             
-            // Country Code
+            // Country Code (VN)
             data.Add("5802VN");
             
             // Merchant Name
             var merchantName = "SOUL FASHION";
             data.Add("59" + merchantName.Length.ToString("D2") + merchantName);
             
-            // Additional Data Field Template
+            // Additional Data Field Template (Purpose of Transaction)
             var additionalData = "00" + transferContent.Length.ToString("D2") + transferContent;
             data.Add("62" + additionalData.Length.ToString("D2") + additionalData);
             

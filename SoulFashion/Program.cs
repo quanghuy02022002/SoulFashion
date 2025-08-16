@@ -111,8 +111,6 @@ builder.Services.AddScoped<IEarningService, EarningService>();
 builder.Services.AddScoped<ICollaboratorEarningCrudService, CollaboratorEarningCrudService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IBankTransferService, BankTransferService>();
-builder.Services.AddScoped<IQrCodeGeneratorService, QrCodeGeneratorService>();
-builder.Services.AddHttpClient();
 // ---- CORS ----
 builder.Services.AddCors(options =>
 {
