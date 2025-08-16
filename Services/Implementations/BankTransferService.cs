@@ -194,11 +194,12 @@ namespace Services.Implementations
             // Tạo QR code theo chuẩn VietQR để app ngân hàng có thể quét trực tiếp
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Tạo dữ liệu QR theo chuẩn EMV QR Code (VietQR) - format chuẩn nhất
-            var qrData = BuildVietQRData(amount, transferContent);
+            // Sử dụng QR code từ app Vietcombank (đã lưu sẵn)
+            // Bạn có thể thay đổi tên file theo số tiền hoặc để cố định
+            var qrCodeFileName = "vietcombank_qr.png";
+            var qrCodePath = $"/Images/QRCodes/{qrCodeFileName}";
             
-            // Sử dụng QR Server với cấu hình tối ưu cho ngân hàng
-            return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=10&ecc=M&qzone=1";
+            return qrCodePath;
         }
 
         private string BuildVietQRData(decimal amount, string transferContent)

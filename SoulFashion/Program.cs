@@ -147,6 +147,7 @@ else
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // Để serve static files từ thư mục Images
 app.UseCors("AllowFrontend3000");
 app.UseAuthentication();
 app.UseAuthorization();
