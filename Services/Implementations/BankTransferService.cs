@@ -191,8 +191,8 @@ namespace Services.Implementations
             // Tạo QR code theo chuẩn VietQR để app ngân hàng có thể quét trực tiếp
             var transferContent = $"{_transferContent}{orderId}";
             
-            // Tạo dữ liệu QR theo chuẩn EMV QR Code (VietQR)
-            var qrData = BuildVietQRData(amount, transferContent);
+            // Thử tạo QR code với format đơn giản hơn
+            var qrData = BuildSimpleVietQRData(amount, transferContent);
             
             // Tạo URL QR code với cấu hình tối ưu
             return $"https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={Uri.EscapeDataString(qrData)}&format=png&margin=15&ecc=H&qzone=2";
@@ -242,6 +242,12 @@ namespace Services.Implementations
             data.Add("6304" + crc);
             
             return string.Join("", data);
+        }
+
+                    private string BuildSimpleVietQRData(decimal amount, string transferContent)
+        {
+            // Tạo QR code đơn giản với format text mà các app ngân hàng có thể đọc
+            return $"VCB|{_accountNumber}|{_accountName}|{amount:N0}|{transferContent}";
         }
 
         private string CalculateCRC16(string data)
