@@ -9,6 +9,7 @@ using Services.Implementations;
 using Services.Interfaces;
 using System.Text;
 using Microsoft.Extensions.Logging.AzureAppServices;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -147,7 +148,13 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // Để serve static files từ thư mục Images
+// Cho phép đọc thêm từ thư mục "Images"
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "Images")),
+    RequestPath = "/Images"
+});
 app.UseCors("AllowFrontend3000");
 app.UseAuthentication();
 app.UseAuthorization();
