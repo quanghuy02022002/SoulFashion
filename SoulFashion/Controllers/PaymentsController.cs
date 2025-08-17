@@ -269,27 +269,11 @@ namespace SoulFashion.Controllers
             try
             {
                 _logger.LogInformation("Getting pending bank transfers");
-
-                // Lấy tất cả payment đang pending
-                var transfers = await _paymentService.GetPendingTransfersAsync();
-
-                // Map thêm thông tin BankTransfer (tái sử dụng logic GetBankTransferInfo)
-                var result = new List<object>();
-
-                foreach (var t in transfers)
-                {
-                    var bankTransferInfo = await GetBankTransferInfo(t.OrderId); // <-- dùng lại hàm có sẵn
-                    if (bankTransferInfo is OkObjectResult okResult)
-                    {
-                        var data = okResult.Value; // lấy data từ response
-                        result.Add(data);
-                    }
-                }
-
+                // This would need to be implemented in the service
                 return Ok(new
                 {
                     success = true,
-                    data = result
+                    message = "Pending transfers endpoint - to be implemented"
                 });
             }
             catch (Exception ex)
@@ -302,7 +286,5 @@ namespace SoulFashion.Controllers
                 });
             }
         }
-
-
     }
 }
