@@ -92,7 +92,6 @@ builder.Services.AddScoped<IOrderStatusHistoryRepository, OrderStatusHistoryRepo
 builder.Services.AddScoped<ICollaboratorEearningRepository, CollaboratorEarningRepository>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 builder.Services.AddScoped<IBankTransferRepository, BankTransferRepository>();
-
 // ---- DI Services ----
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<TokenService>();
@@ -112,6 +111,7 @@ builder.Services.AddScoped<IEarningService, EarningService>();
 builder.Services.AddScoped<ICollaboratorEarningCrudService, CollaboratorEarningCrudService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IBankTransferService, BankTransferService>();
+builder.Services.AddScoped<ICartItemService, CartItemService>();
 builder.Services.AddHttpClient();
 // ---- CORS ----
 builder.Services.AddCors(options =>
