@@ -155,6 +155,7 @@ app.UseStaticFiles(new StaticFileOptions
         Path.Combine(builder.Environment.ContentRootPath, "Images")),
     RequestPath = "/Images"
 });
+builder.Services.AddHttpContextAccessor();
 app.UseCors("AllowFrontend3000");
 app.UseAuthentication();
 app.UseAuthorization();

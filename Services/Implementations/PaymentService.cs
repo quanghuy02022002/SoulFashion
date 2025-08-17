@@ -1,4 +1,5 @@
-﻿using Repositories.DTOs;
+﻿using Microsoft.EntityFrameworkCore;
+using Repositories.DTOs;
 using Repositories.Implementations;
 using Repositories.Interfaces;
 using Repositories.Models;
@@ -167,6 +168,13 @@ namespace Services.Implementations
                 throw new Exception($"Payment not found for transactionRef: {txnRef}");
 
             return payment;
+        }
+        public async Task<List<Payment>> GetPendingTransfersAsync()
+        {
+            return await _db.Payments
+                .Where(p => p.PaymentStatus == "pending")
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
         }
 
     }
