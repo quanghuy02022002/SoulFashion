@@ -262,18 +262,18 @@ namespace SoulFashion.Controllers
                 });
             }
         }
-
         [HttpGet("bank-transfer/pending")]
         public async Task<IActionResult> GetPendingTransfers()
         {
             try
             {
                 _logger.LogInformation("Getting pending bank transfers");
-                // This would need to be implemented in the service
+                var transfers = await _paymentService.GetPendingTransfersAsync();
+
                 return Ok(new
                 {
                     success = true,
-                    message = "Pending transfers endpoint - to be implemented"
+                    data = transfers
                 });
             }
             catch (Exception ex)
@@ -286,5 +286,6 @@ namespace SoulFashion.Controllers
                 });
             }
         }
+
     }
 }

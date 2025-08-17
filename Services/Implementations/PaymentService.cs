@@ -169,13 +169,27 @@ namespace Services.Implementations
 
             return payment;
         }
-        public async Task<List<Payment>> GetPendingTransfersAsync()
+        public async Task<List<PendingTransferDto>> GetPendingTransfersAsync()
         {
             return await _db.Payments
-                .Where(p => p.PaymentStatus == "pending")
+                .Include(p => p.Order)
+                .Where(p => p.PaymentStatus == "pending"
+                         && p.PaymentMethod == "banktransfer")
                 .OrderByDescending(p => p.CreatedAt)
+                .Select(p => new PendingTransferDto
+                {
+                    BankName = "Vietcombank",
+                    AccountNumber = "1015917390",
+                    AccountName = "NGUYEN QUANG HUY",
+                    Branch = "Ho Chi Minh City",
+                    TransferContent = "SOULFASHION" + p.OrderId,
+                    Amount = p.Amount,
+                    OrderId = p.OrderId,
+                    CreatedAt = p.CreatedAt
+                })
                 .ToListAsync();
         }
+
 
     }
 }
