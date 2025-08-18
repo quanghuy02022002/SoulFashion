@@ -189,6 +189,74 @@ namespace Services.Implementations
                 })
                 .ToListAsync();
         }
+        public async Task MarkBankTransferAsPaid(int orderId)
+        {
+            var payment = await _db.Payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.Deposit)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.StatusHistories)
+                .FirstOrDefaultAsync(p => p.OrderId == orderId
+                                       && p.PaymentMethod == "banktransfer");
+
+            if (payment == null)
+                throw new Exception($"Bank transfer payment not found for orderId {orderId}");
+
+            if (string.Equals(payment.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
+                return; // đã thanh toán thì bỏ qua
+
+            // 🔒 BẮT ĐẦU TRANSACTION
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
+            // 1) Cập nhật Payment
+            payment.PaymentStatus = "paid";
+            payment.PaidAt = DateTime.Now;
+            payment.UpdatedAt = DateTime.Now;
+
+            // 2) Cập nhật Order + Deposit + History
+            if (payment.Order != null)
+            {
+                payment.Order.Status = "confirmed";
+                payment.Order.IsPaid = true;
+                payment.Order.UpdatedAt = DateTime.Now;
+
+                if (payment.Order.Deposit != null)
+                {
+                    payment.Order.Deposit.DepositStatus = "paid";
+                    payment.Order.Deposit.PaymentMethod = payment.PaymentMethod;
+                    payment.Order.Deposit.UpdatedAt = DateTime.Now;
+                }
+
+                // đảm bảo list không null
+                payment.Order.StatusHistories ??= new List<OrderStatusHistory>();
+                payment.Order.StatusHistories.Add(new OrderStatusHistory
+                {
+                    OrderId = payment.Order.OrderId,
+                    Status = "confirmed",
+                    Note = $"Thanh toán thành công qua {payment.PaymentMethod}",
+                    ChangedAt = DateTime.Now
+                });
+            }
+
+            // 3) Lưu Payment + Order
+            await _repo.UpdatePaymentWithOrderAsync(payment);
+
+            // 4) Rebuild earnings 30/70 (idempotent)
+            var now = DateTime.Now;
+            await _earningService.RebuildEarningsForOrderAsync(orderId);
+
+            // 5) Đổi status & paidAt cho earnings của order
+            var earnings = await _earningRepo.GetByOrderIdAsync(orderId);
+            foreach (var e in earnings)
+            {
+                e.Status = "paid";
+                e.PaidAt ??= now;
+                e.UpdatedAt = now;
+            }
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
 
 
     }

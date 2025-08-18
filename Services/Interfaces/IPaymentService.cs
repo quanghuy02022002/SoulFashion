@@ -17,6 +17,7 @@ namespace Services.Interfaces
         Task MarkAsPaid(string txnRef);
         Task<Payment> GetByTxnRefAsync(string txnRef);
         Task<List<PendingTransferDto>> GetPendingTransfersAsync();
+        Task MarkBankTransferAsPaid(int orderId);
 
     }
 

@@ -198,7 +198,6 @@ namespace SoulFashion.Controllers
             }
         }
 
-
         [HttpPost("bank-transfer/verify")]
         public async Task<IActionResult> VerifyBankTransfer([FromBody] BankTransferVerificationDto dto)
         {
@@ -206,13 +205,16 @@ namespace SoulFashion.Controllers
             {
                 _logger.LogInformation("Verifying bank transfer for Order #{OrderId}", dto.OrderId);
                 var isVerified = await _bankTransferService.VerifyBankTransferAsync(
-                    dto.OrderId, 
-                    dto.TransactionId, 
-                    dto.Amount, 
+                    dto.OrderId,
+                    dto.TransactionId,
+                    dto.Amount,
                     dto.TransferDate);
 
                 if (isVerified)
                 {
+                    // ✅ Tự động cập nhật Payment + Order + Earnings
+                    await _paymentService.MarkBankTransferAsPaid(dto.OrderId);
+
                     return Ok(new
                     {
                         success = true,
@@ -238,6 +240,8 @@ namespace SoulFashion.Controllers
                 });
             }
         }
+
+
 
         [HttpGet("bank-transfer/status/{orderId}")]
         public async Task<IActionResult> GetBankTransferStatus(int orderId)
