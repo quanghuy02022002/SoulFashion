@@ -16,19 +16,22 @@ namespace Services.Implementations
         private readonly IDepositRepository _depositRepository;
         private readonly IReturnInspectionRepository _returnInspectionRepository;
         private readonly ICostumeRepository _costumeRepository;
+        private readonly IEarningService _earningService;
 
         public OrderService(
             IOrderRepository orderRepository,
             IOrderStatusHistoryRepository statusHistoryRepository,
             IDepositRepository depositRepository,
             IReturnInspectionRepository returnInspectionRepository,
-            ICostumeRepository costumeRepository)
+            ICostumeRepository costumeRepository,
+            IEarningService earningService)
         {
             _orderRepository = orderRepository;
             _statusHistoryRepository = statusHistoryRepository;
             _depositRepository = depositRepository;
             _returnInspectionRepository = returnInspectionRepository;
             _costumeRepository = costumeRepository;
+            _earningService = earningService;
         }
 
         public async Task<IEnumerable<OrderSummaryDto>> GetAllOrdersAsync()
@@ -193,6 +196,12 @@ namespace Services.Implementations
                 ChangedAt = DateTime.Now,
                 Note = "Status updated manually"
             });
+
+            // 🟢 Nếu status = confirmed => build collaborator earnings
+            if (order.Status == "confirmed")
+            {
+                await _earningService.RebuildEarningsForOrderAsync(order.OrderId);
+            }
         }
 
         public async Task RecordReturnInspectionAsync(ReturnInspectionDto dto)
